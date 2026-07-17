@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class Register(BaseModel):
@@ -26,6 +26,18 @@ class VehicleIn(BaseModel):
     width_m: float
     length_m: float
     is_default: bool = False
+
+
+class VehicleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    plate: str
+    height_m: float
+    width_m: float
+    length_m: float
+    is_default: bool
 
 
 class BookingIn(BaseModel):
