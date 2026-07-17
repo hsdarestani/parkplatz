@@ -81,44 +81,61 @@ jobs:
       - name: Build Flutter Web without PWA service-worker cache
         run: flutter build web --release --base-href / --pwa-strategy=none --dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true
 
-      - name: Add immutable deployment cache keys
+      - name: Version production entry assets and direct routes
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           import os
+          import shutil
           from pathlib import Path
 
           sha = os.environ['GITHUB_SHA']
           build_dir = Path('build/web')
           index = build_dir / 'index.html'
           bootstrap = build_dir / 'flutter_bootstrap.js'
+          main = build_dir / 'main.dart.js'
 
-          index_text = index.read_text()
-          if 'flutter_bootstrap.js' not in index_text:
-              raise SystemExit('flutter_bootstrap.js reference not found in index.html')
-          index.write_text(
-              index_text.replace(
-                  'flutter_bootstrap.js',
-                  f'flutter_bootstrap.js?v={sha}',
-                  1,
-              )
-          )
+          if not index.is_file() or not bootstrap.is_file() or not main.is_file():
+              raise SystemExit('Flutter web entry assets are missing')
+
+          versioned_main_name = f'main.{sha}.dart.js'
+          versioned_bootstrap_name = f'flutter_bootstrap.{sha}.js'
+
+          shutil.copy2(main, build_dir / versioned_main_name)
 
           bootstrap_text = bootstrap.read_text()
           if 'main.dart.js' not in bootstrap_text:
               raise SystemExit('main.dart.js reference not found in flutter_bootstrap.js')
-          bootstrap.write_text(
-              bootstrap_text.replace(
-                  'main.dart.js',
-                  f'main.dart.js?v={sha}',
-                  1,
-              )
+          bootstrap_text = bootstrap_text.replace('main.dart.js', versioned_main_name)
+          bootstrap.write_text(bootstrap_text)
+          (build_dir / versioned_bootstrap_name).write_text(bootstrap_text)
+
+          index_text = index.read_text()
+          if 'flutter_bootstrap.js' not in index_text:
+              raise SystemExit('flutter_bootstrap.js reference not found in index.html')
+          index_text = index_text.replace(
+              'flutter_bootstrap.js',
+              versioned_bootstrap_name,
           )
+          index.write_text(index_text)
+
+          # These extensionless files make Nginx `try_files $uri` serve the
+          # current entry document directly instead of a potentially stale
+          # cached SPA fallback for important top-level routes.
+          for route in ('register', 'login', 'bookings', 'discover', 'search'):
+              (build_dir / route).write_text(index_text)
 
           (build_dir / 'build-version.json').write_text(
               json.dumps({'commit': sha}, separators=(',', ':')) + '\n'
           )
+
+          if sha not in index.read_text():
+              raise SystemExit('Versioned bootstrap reference missing from index.html')
+          if not (build_dir / versioned_bootstrap_name).is_file():
+              raise SystemExit('Versioned bootstrap file missing')
+          if not (build_dir / versioned_main_name).is_file():
+              raise SystemExit('Versioned main bundle missing')
           PY
 
       - name: Upload build artifact
@@ -164,12 +181,18 @@ jobs:
             'cd /srv/parkplatz && ./ops/deploy-backend.sh'
           curl --fail --retry 10 --retry-delay 3 https://parkplatz.smarbiz.sbs/api/health
 
-      - name: Verify deployment
+      - name: Verify deployment and direct route entrypoints
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --retry 10 --retry-delay 3 \
-            "https://parkplatz.smarbiz.sbs/?deploy=${GITHUB_SHA}" > /dev/null
+
           curl --fail --show-error --silent --retry 10 --retry-delay 3 \
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
             | grep --fixed-strings "${GITHUB_SHA}"
-          echo "Deployment verified: https://parkplatz.smarbiz.sbs/"
+
+          for route in '' register login bookings discover search; do
+            curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+              "https://parkplatz.smarbiz.sbs/${route}?deploy=${GITHUB_SHA}" \
+              | grep --fixed-strings "${GITHUB_SHA}"
+          done
+
+          echo "Deployment and direct routes verified: https://parkplatz.smarbiz.sbs/"
