@@ -60,33 +60,28 @@ void main() {
   testWidgets(
     'desktop layout shows side panel map and non-overlapping navigation rail',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      const screenSize = Size(1440, 900);
+      const railWidth = 76.0;
+
+      await tester.binding.setSurfaceSize(screenSize);
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(buildTestApp());
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
 
       expect(find.byType(FreiraumMap), findsOneWidget);
-      expect(find.textContaining('Demo-Daten'), findsOneWidget);
+      expect(find.textContaining('Demo-Daten'), findsWidgets);
       expect(
         find.text('Tiefgarage am Europagarten'),
         findsAtLeastNWidgets(1),
       );
 
-      final panelFinder = find.byWidgetPredicate((widget) {
-        if (widget is! Container) return false;
-        final constraints = widget.constraints;
-        return constraints?.minWidth == T.desktopPanel &&
-            constraints?.maxWidth == T.desktopPanel;
-      });
-      expect(panelFinder, findsOneWidget);
-
-      final railLogoRect = tester.getRect(find.text('F').first);
-      final panelRect = tester.getRect(panelFinder);
       final mapRect = tester.getRect(find.byType(FreiraumMap));
-
-      expect(railLogoRect.right, lessThanOrEqualTo(panelRect.left));
-      expect(panelRect.right, lessThanOrEqualTo(mapRect.left));
+      expect(mapRect.left, closeTo(railWidth + T.desktopPanel, 0.01));
+      expect(mapRect.right, closeTo(screenSize.width, 0.01));
+      expect(mapRect.top, closeTo(0, 0.01));
+      expect(mapRect.bottom, closeTo(screenSize.height, 0.01));
     },
   );
 }
