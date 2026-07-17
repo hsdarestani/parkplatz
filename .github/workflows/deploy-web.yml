@@ -81,6 +81,46 @@ jobs:
       - name: Build Flutter Web without PWA service-worker cache
         run: flutter build web --release --base-href / --pwa-strategy=none --dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true
 
+      - name: Add immutable deployment cache keys
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          sha = os.environ['GITHUB_SHA']
+          build_dir = Path('build/web')
+          index = build_dir / 'index.html'
+          bootstrap = build_dir / 'flutter_bootstrap.js'
+
+          index_text = index.read_text()
+          if 'flutter_bootstrap.js' not in index_text:
+              raise SystemExit('flutter_bootstrap.js reference not found in index.html')
+          index.write_text(
+              index_text.replace(
+                  'flutter_bootstrap.js',
+                  f'flutter_bootstrap.js?v={sha}',
+                  1,
+              )
+          )
+
+          bootstrap_text = bootstrap.read_text()
+          if 'main.dart.js' not in bootstrap_text:
+              raise SystemExit('main.dart.js reference not found in flutter_bootstrap.js')
+          bootstrap.write_text(
+              bootstrap_text.replace(
+                  'main.dart.js',
+                  f'main.dart.js?v={sha}',
+                  1,
+              )
+          )
+
+          (build_dir / 'build-version.json').write_text(
+              json.dumps({'commit': sha}, separators=(',', ':')) + '\n'
+          )
+          PY
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -126,6 +166,10 @@ jobs:
 
       - name: Verify deployment
         run: |
+          set -euo pipefail
           curl --fail --show-error --silent --retry 10 --retry-delay 3 \
             "https://parkplatz.smarbiz.sbs/?deploy=${GITHUB_SHA}" > /dev/null
+          curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+            "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
+            | grep --fixed-strings "${GITHUB_SHA}"
           echo "Deployment verified: https://parkplatz.smarbiz.sbs/"
