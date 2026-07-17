@@ -79,7 +79,7 @@ jobs:
         run: flutter test
 
       - name: Build Flutter Web without PWA service-worker cache
-        run: flutter build web --release --base-href / --pwa-strategy=none
+        run: flutter build web --release --base-href / --pwa-strategy=none --dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

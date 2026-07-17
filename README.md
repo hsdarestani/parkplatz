@@ -59,3 +59,54 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 Der optionale Backend-Deploy wird ausschließlich durch das GitHub-Repository-Secret `DEPLOY_BACKEND_ENABLED=true` aktiviert.
+# FREIRAUM Betriebsmodi und API-Architektur
+
+```text
+Flutter (Riverpod AppMode) ── /api/health ── FastAPI ── PostgreSQL
+          │ nicht gesund
+          └── expliziter lokaler Beta-Modus (SharedPreferences)
+```
+
+Beim Start wählt die App nach einer Datenbank-gestützten Gesundheitsprüfung
+entweder den **API-Modus** oder – sofern per Build-Flag erlaubt – den sichtbar
+gekennzeichneten **lokalen Beta-Modus**. Daten beider Modi werden nie gemischt.
+Über „Erneut versuchen“ kann die Verbindung ohne Neustart geprüft werden.
+
+## Lokale Entwicklung
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+cd backend
+alembic upgrade head
+python -m app.db.seed  # idempotent
+uvicorn app.main:app --reload
+```
+
+Flutter Web verwendet `--dart-define=API_BASE_URL=http://localhost:8000/api`,
+Android Emulator `http://10.0.2.2:8000/api` und der iOS Simulator
+`http://127.0.0.1:8000/api`. Der Produktionsbuild nutzt zusätzlich
+`--dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true --pwa-strategy=none`.
+
+## Produktion und Rollback
+
+Einmalig `ops/bootstrap-server.sh` ausführen, `.env.production` (Modus `600`)
+prüfen und die vorhandene Nginx-Konfiguration um den `/api/`-Proxy ergänzen,
+ohne bestehende Zertifikatspfade zu ersetzen. Danach wird das Backend nur bei
+dem GitHub-Secret `DEPLOY_BACKEND_ENABLED=true` durch
+`ops/deploy-backend.sh` aktualisiert. Für ein Rollback den vorherigen Git-Stand
+auschecken und das Deploy-Skript erneut ausführen; niemals
+`docker compose down -v` verwenden. Das persistente Volume bleibt erhalten.
+
+Erforderliche Actions-Secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`
+und optional/standardmäßig deaktiviert `DEPLOY_BACKEND_ENABLED`. JWT-Secret und
+Datenbankpasswort werden auf dem Server nur bei Fehlen erzeugt.
+
+> Web-Härtung: `flutter_secure_storage` kapselt derzeit auch den Refresh-Token.
+> Vor einem öffentlichen Hochsicherheitsbetrieb soll dieser in ein Secure,
+> SameSite, HttpOnly Cookie migriert werden.
+
+## Prüfungen
+
+Backend: `ruff check app tests`, `alembic upgrade head`, Seed zweimal,
+`pytest` und `docker build -t freiraum-api backend`. Flutter: `dart format`,
+`flutter analyze`, `flutter test` sowie der Web-Release-Build ohne PWA-Cache.
