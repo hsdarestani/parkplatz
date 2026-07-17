@@ -14,7 +14,19 @@
 <body>
   <script>
     (async function () {
-      const resetKey = 'freiraum-service-worker-reset-20260717-v2';
+      const resetKey = 'freiraum-service-worker-reset-20260718-v3';
+
+      if (window.location.hash.startsWith('#/')) {
+        const legacyPath = window.location.hash.slice(1);
+        const nextPath = window.location.pathname === '/'
+          ? legacyPath
+          : window.location.pathname;
+        window.history.replaceState(
+          null,
+          '',
+          nextPath + window.location.search
+        );
+      }
 
       try {
         if ('serviceWorker' in navigator) {
@@ -38,7 +50,7 @@
       }
 
       const script = document.createElement('script');
-      script.src = 'flutter_bootstrap.js?v=20260717-2';
+      script.src = 'flutter_bootstrap.js';
       script.async = true;
       document.body.appendChild(script);
     })();
