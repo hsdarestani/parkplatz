@@ -1,0 +1,79 @@
+name: Build and Deploy Flutter Web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parkplatz-production
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build Flutter Web
+        run: flutter build web --release --base-href /
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parkplatz-web-${{ github.sha }}
+          path: build/web
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/parkplatz_deploy
+          chmod 600 ~/.ssh/parkplatz_deploy
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy static build
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/parkplatz_deploy" \
+            build/web/ \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/parkplatz/"
+
+      - name: Verify deployment
+        run: |
+          curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+            https://parkplatz.smarbiz.sbs/ > /dev/null
+          echo "Deployment verified: https://parkplatz.smarbiz.sbs/"
