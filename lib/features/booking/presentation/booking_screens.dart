@@ -55,7 +55,7 @@ class BetaScaffold extends StatelessWidget {
             width: double.infinity,
             color: T.amberSoft,
             padding: const EdgeInsets.all(12),
-            child: const Semantics(
+            child: Semantics(
               liveRegion: true,
               child: Text(
                 'Lokaler Beta-Modus – Buchungen werden nur auf diesem Gerät gespeichert.',
