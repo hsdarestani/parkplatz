@@ -1,48 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:freiraum_parking/features/discovery/presentation/discovery_screen.dart';
+import 'package:freiraum_parking/features/discovery/presentation/map_canvas.dart';
 
 Widget buildTestApp() {
-  return const ProviderScope(
-    child: MaterialApp(
-      home: DiscoveryScreen(),
-    ),
-  );
+  return const ProviderScope(child: MaterialApp(home: DiscoveryScreen()));
 }
 
 void main() {
-  testWidgets('responsive smoke discovery to search', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await tester.pumpWidget(buildTestApp());
-    await tester.pump();
-
-    expect(find.text('Wohin möchtest du?'), findsOneWidget);
-
-    await tester.tap(find.bySemanticsLabel('Suche öffnen'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(find.text('Ankunft vorbereiten'), findsOneWidget);
-
-    await tester.tap(find.text('Messe Frankfurt').first);
-    await tester.pump();
-
-    expect(find.text('VW Golf'), findsOneWidget);
-    expect(find.text('Stellplätze anzeigen'), findsOneWidget);
+  setUpAll(() async {
+    await initializeDateFormatting('de_DE');
   });
+  testWidgets(
+    'mobile discovery opens search with destination and vehicle controls',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-  testWidgets('desktop layout shows side panel', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1200, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(buildTestApp());
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(buildTestApp());
-    await tester.pump();
+      expect(find.text('Wohin möchtest du?'), findsOneWidget);
+      expect(find.textContaining('passende Stellplätze'), findsWidgets);
 
-    expect(find.text('FREIRAUM'), findsOneWidget);
-    expect(find.text('Ankommen, ohne zu suchen.'), findsOneWidget);
-    expect(find.textContaining('Demo-Daten'), findsWidgets);
-  });
+      await tester.tap(find.text('Wohin möchtest du?').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ankunft vorbereiten'), findsOneWidget);
+      expect(find.text('Ziel'), findsOneWidget);
+      await tester.tap(find.text('Messe Frankfurt').first);
+      await tester.pump();
+
+      await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fahrzeug'), findsOneWidget);
+      expect(find.text('VW Golf'), findsOneWidget);
+      expect(find.text('Stellplätze anzeigen'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'desktop layout shows side panel map and non-overlapping navigation rail',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(buildTestApp());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FreiraumMap), findsOneWidget);
+      expect(find.textContaining('Demo-Daten'), findsWidgets);
+      expect(find.textContaining('Tiefgarage am Europagarten'), findsOneWidget);
+    },
+  );
 }
