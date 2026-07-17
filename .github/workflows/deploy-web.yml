@@ -123,7 +123,16 @@ jobs:
           # Use route directories with index.html so Nginx serves text/html.
           # Extensionless HTML files are sent as application/octet-stream and
           # browsers download them instead of rendering the Flutter app.
-          for route in ('register', 'login', 'bookings', 'discover', 'search'):
+          for route in (
+              'register',
+              'login',
+              'bookings',
+              'discover',
+              'search',
+              'profile',
+              'vehicles',
+              'host',
+          ):
               route_dir = build_dir / route
               route_dir.mkdir(parents=True, exist_ok=True)
               (route_dir / 'index.html').write_text(index_text)
@@ -191,7 +200,7 @@ jobs:
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
             | grep --fixed-strings "${GITHUB_SHA}"
 
-          for route in '' register/ login/ bookings/ discover/ search/; do
+          for route in '' register/ login/ bookings/ discover/ search/ profile/ vehicles/ host/; do
             headers="$(mktemp)"
             body="$(mktemp)"
             curl --fail --location --show-error --silent --retry 10 --retry-delay 3 \
