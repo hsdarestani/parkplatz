@@ -1,3 +1,5 @@
+import re
+import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -22,16 +24,24 @@ from app.models import (
 from app.schemas.api import (
     BookingIn,
     CancelIn,
+    HostParkingSpaceIn,
+    HostParkingStatusIn,
     Login,
+    ProfileUpdate,
     Refresh,
     Register,
     VehicleIn,
     VehicleOut,
 )
 from app.services.auth import AuthService
-from app.services.booking import BookingService
+from app.services.booking import BookingService, normalize_booking_time
 
 router = APIRouter(prefix="/api")
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or "stellplatz"
 
 
 def public_space(parking_space: ParkingSpace) -> dict[str, Any]:
@@ -59,9 +69,21 @@ def public_space(parking_space: ParkingSpace) -> dict[str, Any]:
     }
 
 
+def host_space(parking_space: ParkingSpace) -> dict[str, Any]:
+    result = public_space(parking_space)
+    result.update(
+        owner_id=str(parking_space.owner_id) if parking_space.owner_id else None,
+        exact_address=parking_space.exact_address,
+        entrance_instructions=parking_space.entrance_instructions,
+        status=parking_space.status,
+    )
+    return result
+
+
 def booking_out(
     booking: Booking,
     parking_space: ParkingSpace | None = None,
+    vehicle: Vehicle | None = None,
     protected: bool = False,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
@@ -77,19 +99,17 @@ def booking_out(
         "currency": booking.currency,
         "cancelled_at": booking.cancelled_at,
     }
-
-    if (
-        protected
-        and booking.status == BookingStatus.confirmed
-        and parking_space is not None
-    ):
+    if parking_space is not None:
+        result["parking_title"] = parking_space.title
+    if vehicle is not None:
+        result["vehicle_plate"] = vehicle.plate
+    if protected and booking.status == BookingStatus.confirmed and parking_space is not None:
         result.update(
             exact_address=parking_space.exact_address,
             entrance_instructions=parking_space.entrance_instructions,
             access_code=booking.access_code,
             parking_pass_token=booking.parking_pass_token,
         )
-
     return result
 
 
@@ -133,10 +153,7 @@ async def refresh(data: Refresh, db: AsyncSession = Depends(get_session)) -> dic
             RefreshToken.revoked_at.is_(None),
         )
     )
-    if (
-        refresh_record is None
-        or refresh_record.expires_at < datetime.now(timezone.utc)
-    ):
+    if refresh_record is None or refresh_record.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "invalid_refresh", "message": "Sitzung abgelaufen."},
@@ -152,9 +169,7 @@ async def refresh(data: Refresh, db: AsyncSession = Depends(get_session)) -> dic
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(data: Refresh, db: AsyncSession = Depends(get_session)) -> None:
     refresh_record = await db.scalar(
-        select(RefreshToken).where(
-            RefreshToken.token_hash == token_hash(data.refresh_token)
-        )
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash(data.refresh_token))
     )
     if refresh_record is not None:
         refresh_record.revoked_at = datetime.now(timezone.utc)
@@ -169,6 +184,25 @@ async def me(
     user = await db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "display_name": user.display_name,
+    }
+
+
+@router.patch("/auth/me")
+async def update_me(
+    data: ProfileUpdate,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    user.display_name = data.display_name.strip()
+    await db.commit()
+    await db.refresh(user)
     return {
         "id": str(user.id),
         "email": user.email,
@@ -205,7 +239,7 @@ async def space(
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     parking_space = await db.get(ParkingSpace, space_id)
-    if parking_space is None:
+    if parking_space is None or parking_space.status != "active":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return public_space(parking_space)
 
@@ -217,19 +251,98 @@ async def availability(
     end_at: datetime,
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    normalized_start = normalize_booking_time(start_at)
+    normalized_end = normalize_booking_time(end_at)
     overlap = await db.scalar(
         select(Booking.id).where(
             Booking.parking_space_id == space_id,
             Booking.status.in_([BookingStatus.pending, BookingStatus.confirmed]),
-            Booking.start_at < end_at,
-            Booking.end_at > start_at,
+            Booking.start_at < normalized_end,
+            Booking.end_at > normalized_start,
         )
     )
     return {
         "available": overlap is None,
-        "start_at": start_at,
-        "end_at": end_at,
+        "start_at": normalized_start,
+        "end_at": normalized_end,
     }
+
+
+@router.get("/host/parking-spaces")
+async def host_spaces(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    result = await db.scalars(
+        select(ParkingSpace)
+        .where(ParkingSpace.owner_id == user_id)
+        .order_by(ParkingSpace.created_at.desc())
+    )
+    return [host_space(parking_space) for parking_space in result.all()]
+
+
+@router.post(
+    "/host/parking-spaces",
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_host_space(
+    data: HostParkingSpaceIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    payload = data.model_dump()
+    payload["currency"] = data.currency.upper()
+    parking_space = ParkingSpace(
+        owner_id=user_id,
+        slug=f"{_slugify(data.title)}-{secrets.token_hex(3)}",
+        is_verified=False,
+        rating=0,
+        review_count=0,
+        status="active",
+        **payload,
+    )
+    db.add(parking_space)
+    await db.commit()
+    await db.refresh(parking_space)
+    return host_space(parking_space)
+
+
+@router.patch("/host/parking-spaces/{space_id}/status")
+async def set_host_space_status(
+    space_id: uuid.UUID,
+    data: HostParkingStatusIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    parking_space = await db.scalar(
+        select(ParkingSpace).where(
+            ParkingSpace.id == space_id,
+            ParkingSpace.owner_id == user_id,
+        )
+    )
+    if parking_space is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    parking_space.status = data.status
+    await db.commit()
+    await db.refresh(parking_space)
+    return host_space(parking_space)
+
+
+@router.get("/host/bookings")
+async def host_bookings(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    rows = (
+        await db.execute(
+            select(Booking, ParkingSpace, Vehicle)
+            .join(ParkingSpace, ParkingSpace.id == Booking.parking_space_id)
+            .join(Vehicle, Vehicle.id == Booking.vehicle_id)
+            .where(ParkingSpace.owner_id == user_id)
+            .order_by(Booking.start_at.desc())
+        )
+    ).all()
+    return [booking_out(booking, parking, vehicle) for booking, parking, vehicle in rows]
 
 
 @router.get("/vehicles", response_model=list[VehicleOut])
@@ -303,7 +416,9 @@ async def create_booking(
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     booking = await BookingService.create(db, user_id, data)
-    return booking_out(booking)
+    parking_space = await db.get(ParkingSpace, booking.parking_space_id)
+    vehicle = await db.get(Vehicle, booking.vehicle_id)
+    return booking_out(booking, parking_space, vehicle)
 
 
 @router.get("/bookings")
@@ -311,10 +426,16 @@ async def bookings(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
-    result = await db.scalars(
-        select(Booking).where(Booking.user_id == user_id).order_by(Booking.start_at)
-    )
-    return [booking_out(booking) for booking in result.all()]
+    rows = (
+        await db.execute(
+            select(Booking, ParkingSpace, Vehicle)
+            .join(ParkingSpace, ParkingSpace.id == Booking.parking_space_id)
+            .join(Vehicle, Vehicle.id == Booking.vehicle_id)
+            .where(Booking.user_id == user_id)
+            .order_by(Booking.start_at)
+        )
+    ).all()
+    return [booking_out(booking, parking, vehicle) for booking, parking, vehicle in rows]
 
 
 @router.get("/bookings/{booking_id}")
@@ -333,7 +454,8 @@ async def booking(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     parking_space = await db.get(ParkingSpace, booking_record.parking_space_id)
-    return booking_out(booking_record, parking_space, protected=True)
+    vehicle = await db.get(Vehicle, booking_record.vehicle_id)
+    return booking_out(booking_record, parking_space, vehicle, protected=True)
 
 
 @router.post("/bookings/{booking_id}/cancel")
@@ -375,4 +497,6 @@ async def cancel(
         )
     )
     await db.commit()
-    return booking_out(booking_record)
+    parking_space = await db.get(ParkingSpace, booking_record.parking_space_id)
+    vehicle = await db.get(Vehicle, booking_record.vehicle_id)
+    return booking_out(booking_record, parking_space, vehicle)
