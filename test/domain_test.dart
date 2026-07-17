@@ -1,2 +1,31 @@
-import 'package:flutter_test/flutter_test.dart';import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';import 'package:freiraum_parking/features/search/data/demo_search_data.dart';import 'package:freiraum_parking/shared/models/models.dart';
-void main(){test('demo data is consistent and protects exact addresses',(){final repo=DemoParkingRepository();expect(repo.all(),hasLength(12));for(final s in repo.all()){expect(s.title,isNot(contains('Parking 1')));expect(s.approximate(),contains(s.district));expect(s.currency,'EUR');}});test('parking compatibility logic works',(){final s=DemoParkingRepository.spaces.first;expect(s.fits(demoVehicles.first),isTrue);expect(s.fits(demoVehicles[2]),isFalse);});test('filters and sorting update results',(){final q=SearchQuery(destination:demoDestinations.first,start:DateTime(2026,7,17,18),end:DateTime(2026,7,17,22),vehicle:demoVehicles.first,filters:{'ev','covered','fit'},sort:'Preis');final r=DemoParkingRepository().search(q);expect(r.every((s)=>s.ev&&s.covered&&s.fits(demoVehicles.first)),isTrue);expect(r.first.hourlyPrice<=r.last.hourlyPrice,isTrue);});test('search form validation, destination, duration and vehicle selection',(){var q=SearchQuery(start:DateTime(2026,7,17,18),end:DateTime(2026,7,17,22));expect(q.valid,isFalse);q=q.copyWith(destination:demoDestinations[1],vehicle:demoVehicles[1],end:q.start.add(const Duration(hours:2)));expect(q.valid,isTrue);expect(q.hours,2);expect(q.vehicle!.name,'BMW 3er');});}
+import 'package:flutter_test/flutter_test.dart';
+import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';
+import 'package:freiraum_parking/features/search/data/demo_search_data.dart';
+import 'package:freiraum_parking/shared/models/models.dart';
+
+void main() {
+  test('demo data is consistent and protects exact addresses', () async {
+    final spaces = await DemoParkingRepository().all();
+    expect(spaces, hasLength(12));
+    for (final space in spaces) {
+      expect(space.title, isNot(contains('Parking 1')));
+      expect(space.approximate(), contains(space.district));
+      expect(space.currency, 'EUR');
+    }
+  });
+  test('parking compatibility logic works', () {
+    final space = DemoParkingRepository.spaces.first;
+    expect(space.fits(demoVehicles.first), isTrue);
+    expect(space.fits(demoVehicles[2]), isFalse);
+  });
+  test('filters and sorting update results', () {
+    final query = SearchQuery(destination: demoDestinations.first, start: DateTime(2026, 7, 17, 18), end: DateTime(2026, 7, 17, 22), vehicle: demoVehicles.first, filters: {'ev', 'covered', 'fit'}, sort: 'Preis');
+    final results = filterParkingSpaces(DemoParkingRepository.spaces, query);
+    expect(results.every((space) => space.ev && space.covered && space.fits(demoVehicles.first)), isTrue);
+    expect(results.first.hourlyPrice <= results.last.hourlyPrice, isTrue);
+  });
+  test('UUID parking IDs are preserved by repository lookup', () async {
+    const uuid = '7cc92f53-f948-4c18-8c15-68220f915f11';
+    expect(await DemoParkingRepository().byId(uuid), isNull);
+  });
+}

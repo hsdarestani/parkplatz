@@ -26,7 +26,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   Widget build(BuildContext context) {
     final desktop = MediaQuery.sizeOf(context).width > T.desktop;
     final query = ref.watch(searchProvider);
-    final results = ref.watch(parkingResultsProvider);
+    final mode = ref.watch(appModeProvider);
+    final spacesState = ref.watch(parkingResultsProvider);
+    final results = ref.watch(parkingResultsListProvider);
     final selected =
         ref.watch(selectedParkingIdProvider) ?? results.firstOrNull?.id;
     if (ref.watch(selectedParkingIdProvider) == null && results.isNotEmpty) {
@@ -60,7 +62,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                     onProfile: () => _profile(context),
                     onLocation: () => _snack(
                       context,
-                      'Demo-Standort Frankfurt verwendet. Keine Hintergrund-Ortung.',
+                      mode == AppMode.localBeta
+                          ? 'Demo-Standort Frankfurt verwendet. Keine Hintergrund-Ortung.'
+                          : 'Standort wird nur auf Anfrage verwendet. Keine Hintergrund-Ortung.',
                     ),
                   ),
                 ),
@@ -68,6 +72,12 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                   _MobileSheet(
                     onDetails: (spaceTitle) => _details(context, spaceTitle),
                   ),
+                if (spacesState.isLoading)
+                  const Positioned.fill(child: _DataState(message: 'Live-Stellplätze werden geladen …', loading: true)),
+                if (spacesState.hasError)
+                  Positioned.fill(child: _DataState(message: 'Stellplätze konnten nicht geladen werden.', onRetry: () => ref.invalidate(parkingSpacesProvider))),
+                if (spacesState.hasValue && results.isEmpty)
+                  const Positioned.fill(child: _DataState(message: 'Für diese Suche sind keine Stellplätze verfügbar.')),
                 if (resolving) _ResolutionToast(status: status),
                 if (desktop)
                   Positioned(
@@ -75,7 +85,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                     left: 20,
                     child: _MapContext(
                       destination: query.destination?.name ?? 'Frankfurt',
-                      text: '${results.length} passende Stellplätze · Demo',
+                      text: mode == AppMode.localBeta
+                          ? '${results.length} passende Stellplätze · Demo'
+                          : '${results.length} passende Stellplätze · Live',
                     ),
                   ),
               ],
@@ -118,12 +130,12 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
     );
     setState(
       () => status =
-          '${ref.read(parkingResultsProvider).length} passende Stellplätze',
+          '${ref.read(parkingResultsListProvider).length} passende Stellplätze',
     );
     await Future.delayed(
       reduced ? Duration.zero : const Duration(milliseconds: 420),
     );
-    final first = ref.read(parkingResultsProvider).firstOrNull;
+    final first = ref.read(parkingResultsListProvider).firstOrNull;
     if (first != null)
       ref.read(selectedParkingIdProvider.notifier).state = first.id;
     setState(() => status = 'Deine Ankunft ist vorbereitet');
@@ -137,9 +149,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
     BuildContext context,
     String title,
   ) {
-    final space = ref.read(parkingResultsProvider).firstWhere(
+    final space = ref.read(parkingResultsListProvider).firstWhere(
           (item) => item.title == title,
-          orElse: () => ref.read(parkingResultsProvider).first,
+          orElse: () => ref.read(parkingResultsListProvider).first,
         );
     context.go('/parking/${space.id}');
   }
@@ -185,7 +197,7 @@ class _Panel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final q = ref.watch(searchProvider);
-    final results = ref.watch(parkingResultsProvider);
+    final results = ref.watch(parkingResultsListProvider);
     return Container(
       width: T.desktopPanel,
       color: T.porcelain,
@@ -221,9 +233,11 @@ class _Panel extends ConsumerWidget {
             '${results.length} passende Stellplätze',
             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
           ),
-          const Text(
-            'Demo-Daten · genaue Zufahrt erst nach Buchung',
-            style: TextStyle(color: T.muted, fontWeight: FontWeight.w700),
+          Text(
+            ref.watch(appModeProvider) == AppMode.localBeta
+                ? 'Demo-Daten · genaue Zufahrt erst nach Buchung'
+                : 'Live-Daten · genaue Zufahrt erst nach Buchung',
+            style: const TextStyle(color: T.muted, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Expanded(
@@ -258,7 +272,7 @@ class _MobileSheet extends ConsumerWidget {
   const _MobileSheet({required this.onDetails});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final results = ref.watch(parkingResultsProvider);
+    final results = ref.watch(parkingResultsListProvider);
     final q = ref.watch(searchProvider);
     return DraggableScrollableSheet(
       initialChildSize: .34,
@@ -299,7 +313,8 @@ class _MobileSheet extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const _DemoBadge(),
+                if (ref.watch(appModeProvider) == AppMode.localBeta)
+                  const _DemoBadge(),
               ],
             ),
             const SizedBox(height: 8),
@@ -637,4 +652,18 @@ class _EmptyResults extends ConsumerWidget {
           ),
         ),
       );
+}
+
+class _DataState extends StatelessWidget {
+  const _DataState({required this.message, this.loading = false, this.onRetry});
+  final String message; final bool loading; final VoidCallback? onRetry;
+  @override Widget build(BuildContext context) => ColoredBox(
+    color: T.porcelain.withOpacity(.94),
+    child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      if (loading) const CircularProgressIndicator(),
+      if (loading) const SizedBox(height: 16),
+      Text(message, style: const TextStyle(fontWeight: FontWeight.w800)),
+      if (onRetry != null) TextButton(onPressed: onRetry, child: const Text('Erneut versuchen')),
+    ])),
+  );
 }

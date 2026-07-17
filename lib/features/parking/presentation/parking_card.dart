@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../booking/data/repositories.dart';
 
 import '../../../config/design_tokens.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/illustration.dart';
 
-class ParkingCard extends StatelessWidget {
+class ParkingCard extends ConsumerWidget {
   final ParkingSpace s;
   final SearchQuery q;
   final bool selected;
@@ -23,7 +26,8 @@ class ParkingCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localBeta = ref.watch(appModeProvider) == AppMode.localBeta;
     final currency = NumberFormat.currency(locale: 'de_DE', symbol: '€');
     final fit = q.vehicle == null || s.fits(q.vehicle!);
     return Semantics(
@@ -146,7 +150,7 @@ class ParkingCard extends StatelessWidget {
                 children: [
                   _Pill(
                     text:
-                        s.verified ? 'Verifizierter Standort' : 'Demo-geprüft',
+                        s.verified ? 'Verifizierter Standort' : localBeta ? 'Demo-geprüft' : 'Nicht verifiziert',
                   ),
                   _Pill(
                     text: s.instant ? 'Sofort verfügbar' : 'Anfrage prüfbar',
@@ -156,7 +160,7 @@ class ParkingCard extends StatelessWidget {
               ),
               if (selected) ...[
                 const SizedBox(height: 12),
-                ParkingPreview(space: s, query: q, onDetails: onDetails),
+                ParkingPreview(space: s, query: q, onDetails: onDetails, localBeta: localBeta),
               ],
             ],
           ),
@@ -170,11 +174,13 @@ class ParkingPreview extends StatelessWidget {
   final ParkingSpace space;
   final SearchQuery query;
   final VoidCallback? onDetails;
+  final bool localBeta;
   const ParkingPreview({
     super.key,
     required this.space,
     required this.query,
     this.onDetails,
+    required this.localBeta,
   });
 
   @override
@@ -202,7 +208,7 @@ class ParkingPreview extends StatelessWidget {
           ),
           _PreviewLine(
             icon: Icons.verified_outlined,
-            text: space.verified ? 'Verifiziert' : 'Demo',
+            text: space.verified ? 'Verifiziert' : localBeta ? 'Demo' : 'Nicht verifiziert',
           ),
           _PreviewLine(
             icon: Icons.payments_outlined,

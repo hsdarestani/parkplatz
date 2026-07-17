@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/design_tokens.dart';
 import '../../../shared/models/models.dart';
+import '../../booking/data/repositories.dart';
 import '../data/demo_search_data.dart';
 import 'search_controller.dart';
 
@@ -50,11 +51,13 @@ class SearchSheet extends ConsumerWidget {
                 ),
               ],
             ),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Demo: Manuelle Suche funktioniert ohne Standortfreigabe.',
-                style: TextStyle(color: T.muted, fontWeight: FontWeight.w600),
+                ref.watch(appModeProvider) == AppMode.localBeta
+                    ? 'Demo: Manuelle Suche funktioniert ohne Standortfreigabe.'
+                    : 'Manuelle Suche funktioniert ohne Standortfreigabe.',
+                style: const TextStyle(color: T.muted, fontWeight: FontWeight.w600),
               ),
             ),
             Flexible(

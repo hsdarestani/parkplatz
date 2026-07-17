@@ -1,9 +1,24 @@
 import '../../../shared/models/models.dart';
 
-abstract class ParkingRepository {
-  List<ParkingSpace> all();
-  List<ParkingSpace> search(SearchQuery query);
+abstract interface class ParkingRepository {
+  Future<List<ParkingSpace>> all();
+  Future<ParkingSpace?> byId(String id);
 }
+
+List<ParkingSpace> filterParkingSpaces(List<ParkingSpace> spaces, SearchQuery query) {
+  var result = spaces.where((space) {
+    final filters = query.filters;
+    return (!filters.contains('ev') || space.ev) &&
+        (!filters.contains('covered') || space.covered) &&
+        (!filters.contains('accessible') || space.accessible) &&
+        (!filters.contains('instant') || space.instant) &&
+        (!filters.contains('fit') || query.vehicle == null || space.fits(query.vehicle!));
+  }).toList();
+  if (query.sort == 'Preis') result.sort((a, b) => a.hourlyPrice.compareTo(b.hourlyPrice));
+  if (query.sort == 'Entfernung') result.sort((a, b) => a.walkingMeters.compareTo(b.walkingMeters));
+  return result;
+}
+
 
 class DemoParkingRepository implements ParkingRepository {
   static const spaces = [
@@ -345,21 +360,9 @@ class DemoParkingRepository implements ParkingRepository {
     ),
   ];
   @override
-  List<ParkingSpace> all() => spaces;
+  Future<List<ParkingSpace>> all() async => spaces;
+
   @override
-  List<ParkingSpace> search(SearchQuery q) {
-    var r = spaces.where((s) => s.available).toList();
-    if (q.vehicle != null && q.filters.contains('fit'))
-      r = r.where((s) => s.fits(q.vehicle!)).toList();
-    if (q.filters.contains('covered')) r = r.where((s) => s.covered).toList();
-    if (q.filters.contains('ev')) r = r.where((s) => s.ev).toList();
-    if (q.filters.contains('accessible'))
-      r = r.where((s) => s.accessible).toList();
-    if (q.filters.contains('instant')) r = r.where((s) => s.instant).toList();
-    if (q.sort == 'Preis')
-      r.sort((a, b) => a.hourlyPrice.compareTo(b.hourlyPrice));
-    if (q.sort == 'Fußweg')
-      r.sort((a, b) => a.walkingMinutes.compareTo(b.walkingMinutes));
-    return r;
-  }
+  Future<ParkingSpace?> byId(String id) async =>
+      spaces.where((space) => space.id == id).firstOrNull;
 }

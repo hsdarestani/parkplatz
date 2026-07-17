@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:freiraum_parking/features/discovery/presentation/discovery_screen.dart';
 import 'package:freiraum_parking/features/discovery/presentation/map_canvas.dart';
+import 'package:freiraum_parking/features/booking/data/repositories.dart';
 
 Widget buildTestApp() {
-  return const ProviderScope(child: MaterialApp(home: DiscoveryScreen()));
+  return ProviderScope(overrides: [appModeProvider.overrideWith((ref) => AppModeController.fixed(AppMode.localBeta))], child: const MaterialApp(home: DiscoveryScreen()));
 }
 
 void main() {

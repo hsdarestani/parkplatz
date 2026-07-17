@@ -27,7 +27,7 @@ class _FreiraumMapState extends ConsumerState<FreiraumMap> {
 
   @override
   Widget build(BuildContext context) {
-    final spaces = ref.watch(parkingResultsProvider);
+    final spaces = ref.watch(parkingResultsListProvider);
     final selectedId = ref.watch(selectedParkingIdProvider);
     final query = ref.watch(searchProvider);
     final selected = spaces.where((s) => s.id == selectedId).firstOrNull;
