@@ -2,6 +2,7 @@ import math
 import secrets
 import uuid
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -16,6 +17,20 @@ from app.models import (
     Vehicle,
 )
 from app.schemas.api import BookingIn
+
+FRANKFURT_TIMEZONE = ZoneInfo("Europe/Berlin")
+
+
+def normalize_booking_time(value: datetime) -> datetime:
+    """Return a timezone-aware UTC timestamp for booking comparisons and storage.
+
+    Current Flutter Web clients may send a local wall-clock value without an
+    offset. Since the MVP operates in Frankfurt, interpret those legacy values
+    in Europe/Berlin. Offset-aware clients keep their original instant.
+    """
+    if value.utcoffset() is None:
+        value = value.replace(tzinfo=FRANKFURT_TIMEZONE)
+    return value.astimezone(timezone.utc)
 
 
 class BookingService:
@@ -34,15 +49,10 @@ class BookingService:
         if previous_booking is not None:
             return previous_booking
 
+        start_at = normalize_booking_time(data.start_at)
+        end_at = normalize_booking_time(data.end_at)
         now = datetime.now(timezone.utc)
-        timestamps_have_timezone = (
-            data.start_at.utcoffset() is not None and data.end_at.utcoffset() is not None
-        )
-        if (
-            not timestamps_have_timezone
-            or data.end_at <= data.start_at
-            or data.start_at <= now
-        ):
+        if end_at <= start_at or start_at <= now:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
@@ -51,7 +61,7 @@ class BookingService:
                 },
             )
 
-        duration_hours = (data.end_at - data.start_at).total_seconds() / 3600
+        duration_hours = (end_at - start_at).total_seconds() / 3600
         if duration_hours < 1 or duration_hours > 24:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -105,15 +115,15 @@ class BookingService:
             select(Booking.id).where(
                 Booking.parking_space_id == parking_space.id,
                 Booking.status.in_([BookingStatus.pending, BookingStatus.confirmed]),
-                Booking.start_at < data.end_at,
-                Booking.end_at > data.start_at,
+                Booking.start_at < end_at,
+                Booking.end_at > start_at,
             )
         )
         availability_block = await db.scalar(
             select(AvailabilityBlock.id).where(
                 AvailabilityBlock.parking_space_id == parking_space.id,
-                AvailabilityBlock.start_at < data.end_at,
-                AvailabilityBlock.end_at > data.start_at,
+                AvailabilityBlock.start_at < end_at,
+                AvailabilityBlock.end_at > start_at,
             )
         )
         if overlapping_booking is not None or availability_block is not None:
@@ -133,8 +143,8 @@ class BookingService:
             user_id=user_id,
             parking_space_id=parking_space.id,
             vehicle_id=vehicle.id,
-            start_at=data.start_at,
-            end_at=data.end_at,
+            start_at=start_at,
+            end_at=end_at,
             status=BookingStatus.confirmed,
             hourly_price_cents_snapshot=parking_space.hourly_price_cents,
             total_price_cents=(
