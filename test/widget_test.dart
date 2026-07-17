@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/date_symbol_data_local.dart';
+import 'package:freiraum_parking/features/booking/data/repositories.dart';
 import 'package:freiraum_parking/features/discovery/presentation/discovery_screen.dart';
 import 'package:freiraum_parking/features/discovery/presentation/map_canvas.dart';
-import 'package:freiraum_parking/features/booking/data/repositories.dart';
+import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';
+import 'package:freiraum_parking/features/parking/data/providers.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Widget buildTestApp() {
-  return ProviderScope(overrides: [appModeProvider.overrideWith((ref) => AppModeController.fixed(AppMode.localBeta))], child: const MaterialApp(home: DiscoveryScreen()));
+  return ProviderScope(
+    overrides: [
+      appModeProvider.overrideWith(
+        (ref) => AppModeController.fixed(AppMode.localBeta),
+      ),
+      parkingSpacesProvider.overrideWith(
+        (ref) => Future.value(DemoParkingRepository.spaces),
+      ),
+    ],
+    child: const MaterialApp(home: DiscoveryScreen()),
+  );
 }
 
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('de_DE');
   });
+
   testWidgets(
     'mobile discovery opens search with destination and vehicle controls',
     (tester) async {
@@ -53,8 +66,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(FreiraumMap), findsOneWidget);
-      expect(find.textContaining('Demo-Daten'), findsWidgets);
-      expect(find.textContaining('Tiefgarage am Europagarten'), findsOneWidget);
+      expect(find.textContaining('Demo-Daten'), findsOneWidget);
+      expect(
+        find.text('Tiefgarage am Europagarten'),
+        findsAtLeastNWidgets(1),
+      );
+
+      final mapRect = tester.getRect(find.byType(FreiraumMap));
+      final firstParkingTitleRect = tester.getRect(
+        find.text('Tiefgarage am Europagarten').first,
+      );
+      expect(firstParkingTitleRect.right, lessThanOrEqualTo(mapRect.left));
     },
   );
 }
