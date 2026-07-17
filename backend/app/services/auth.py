@@ -32,7 +32,10 @@ class AuthService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "email_unavailable",
-                    "message": "Registrierung nicht möglich.",
+                    "message": (
+                        "Diese E-Mail-Adresse ist bereits registriert. "
+                        "Bitte melde dich an."
+                    ),
                 },
             )
 
