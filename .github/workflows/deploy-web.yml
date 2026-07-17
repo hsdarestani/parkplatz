@@ -120,11 +120,13 @@ jobs:
           )
           index.write_text(index_text)
 
-          # These extensionless files make Nginx `try_files $uri` serve the
-          # current entry document directly instead of a potentially stale
-          # cached SPA fallback for important top-level routes.
+          # Use route directories with index.html so Nginx serves text/html.
+          # Extensionless HTML files are sent as application/octet-stream and
+          # browsers download them instead of rendering the Flutter app.
           for route in ('register', 'login', 'bookings', 'discover', 'search'):
-              (build_dir / route).write_text(index_text)
+              route_dir = build_dir / route
+              route_dir.mkdir(parents=True, exist_ok=True)
+              (route_dir / 'index.html').write_text(index_text)
 
           (build_dir / 'build-version.json').write_text(
               json.dumps({'commit': sha}, separators=(',', ':')) + '\n'
@@ -189,10 +191,16 @@ jobs:
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
             | grep --fixed-strings "${GITHUB_SHA}"
 
-          for route in '' register login bookings discover search; do
-            curl --fail --show-error --silent --retry 10 --retry-delay 3 \
-              "https://parkplatz.smarbiz.sbs/${route}?deploy=${GITHUB_SHA}" \
-              | grep --fixed-strings "${GITHUB_SHA}"
+          for route in '' register/ login/ bookings/ discover/ search/; do
+            headers="$(mktemp)"
+            body="$(mktemp)"
+            curl --fail --location --show-error --silent --retry 10 --retry-delay 3 \
+              --dump-header "$headers" \
+              --output "$body" \
+              "https://parkplatz.smarbiz.sbs/${route}?deploy=${GITHUB_SHA}"
+            grep --ignore-case --extended-regexp '^content-type: text/html([;[:space:]]|$)' "$headers"
+            grep --fixed-strings "${GITHUB_SHA}" "$body"
+            rm -f "$headers" "$body"
           done
 
-          echo "Deployment and direct routes verified: https://parkplatz.smarbiz.sbs/"
+          echo "Deployment and HTML direct routes verified: https://parkplatz.smarbiz.sbs/"
