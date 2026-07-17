@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/brand_config.dart';
 import '../../../config/design_tokens.dart';
+import '../../booking/data/repositories.dart';
 import '../../parking/data/providers.dart';
 import '../../parking/presentation/parking_card.dart';
 import '../../search/presentation/search_controller.dart';
