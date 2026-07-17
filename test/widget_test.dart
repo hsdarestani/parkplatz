@@ -22,6 +22,11 @@ Widget buildTestApp() {
   );
 }
 
+Future<void> disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('de_DE');
@@ -53,6 +58,8 @@ void main() {
       expect(find.text('Fahrzeug'), findsOneWidget);
       expect(find.text('VW Golf'), findsOneWidget);
       expect(find.text('Stellplätze anzeigen'), findsOneWidget);
+
+      await disposeTestApp(tester);
     },
   );
 
@@ -77,6 +84,8 @@ void main() {
 
       expect(railLogoRect.center.dx, lessThan(brandRect.center.dx));
       expect(brandRect.center.dx, lessThan(mapRect.center.dx));
+
+      await disposeTestApp(tester);
     },
   );
 }
