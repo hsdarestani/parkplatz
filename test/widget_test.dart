@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:freiraum_parking/config/design_tokens.dart';
 import 'package:freiraum_parking/features/booking/data/repositories.dart';
 import 'package:freiraum_parking/features/discovery/presentation/discovery_screen.dart';
 import 'package:freiraum_parking/features/discovery/presentation/map_canvas.dart';
@@ -72,11 +73,20 @@ void main() {
         findsAtLeastNWidgets(1),
       );
 
+      final panelFinder = find.byWidgetPredicate((widget) {
+        if (widget is! Container) return false;
+        final constraints = widget.constraints;
+        return constraints?.minWidth == T.desktopPanel &&
+            constraints?.maxWidth == T.desktopPanel;
+      });
+      expect(panelFinder, findsOneWidget);
+
+      final railLogoRect = tester.getRect(find.text('F').first);
+      final panelRect = tester.getRect(panelFinder);
       final mapRect = tester.getRect(find.byType(FreiraumMap));
-      final firstParkingTitleRect = tester.getRect(
-        find.text('Tiefgarage am Europagarten').first,
-      );
-      expect(firstParkingTitleRect.right, lessThanOrEqualTo(mapRect.left));
+
+      expect(railLogoRect.right, lessThanOrEqualTo(panelRect.left));
+      expect(panelRect.right, lessThanOrEqualTo(mapRect.left));
     },
   );
 }
