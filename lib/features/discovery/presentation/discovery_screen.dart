@@ -39,7 +39,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
       body: Row(
         children: [
           if (desktop)
-            _DesktopRail(onPreview: (title) => _preview(context, title)),
+            _DesktopRail(onPreview: (title) => title == 'Buchungen'
+                ? context.go('/bookings')
+                : _preview(context, title)),
           if (desktop)
             _Panel(
               openSearch: () => _openSearch(context),
@@ -134,34 +136,13 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   void _details(
     BuildContext context,
     String title,
-  ) =>
-      showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: T.porcelain,
-        builder: (_) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style:
-                    const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Diese Detailvorschau schützt die genaue Adresse bis zur Buchung. Als Nächstes folgen vollständige Zufahrtsbeschreibung, Stornierungsbedingungen, Bewertungen und Buchung.',
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Verstanden'),
-              ),
-            ],
-          ),
-        ),
-      );
+  ) {
+    final space = ref.read(parkingResultsProvider).firstWhere(
+          (item) => item.title == title,
+          orElse: () => ref.read(parkingResultsProvider).first,
+        );
+    context.go('/parking/${space.id}');
+  }
 
   void _preview(BuildContext context, String title) =>
       showModalBottomSheet<void>(

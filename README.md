@@ -32,3 +32,30 @@ The app renders a local navigation-instrument city grid underneath markers, so t
 
 ## Reset demo state
 Open the profile preview and use **Demo zurücksetzen** in later iterations; the persistence service already clears demo preference keys.
+
+## Iteration 3: Booking-Backend
+
+Für die lokale API wird PostgreSQL vorausgesetzt:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d db
+cd backend && pip install -e '.[test]'
+alembic upgrade head
+python -m app.db.seed
+uvicorn app.main:app --reload
+```
+
+Die Flutter-App wird mit `--dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true` gebaut. Solange die API nicht aktiviert ist, kennzeichnet die Oberfläche jede lokale Reservierung und speichert niemals eine geschützte Backend-Adresse.
+
+Einmalig auf dem Produktionsserver:
+
+```bash
+sudo install -d -m 700 /srv/parkplatz
+sudo chown "$USER":"$USER" /srv/parkplatz
+cd /srv/parkplatz
+./ops/bootstrap-server.sh
+sudo install -m 644 ops/nginx/parkplatz.smarbiz.sbs.conf /etc/nginx/sites-available/parkplatz.smarbiz.sbs.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Der optionale Backend-Deploy wird ausschließlich durch das GitHub-Repository-Secret `DEPLOY_BACKEND_ENABLED=true` aktiviert.

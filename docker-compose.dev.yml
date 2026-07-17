@@ -1,0 +1,12 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: freiraum, POSTGRES_USER: freiraum, POSTGRES_PASSWORD: freiraum}
+    ports: ["5432:5432"]
+    volumes: [freiraum_dev_db:/var/lib/postgresql/data]
+  api:
+    build: ./backend
+    environment: {DATABASE_URL: postgresql+psycopg://freiraum:freiraum@db:5432/freiraum, JWT_SECRET: development-secret-change-me}
+    ports: ["8000:8000"]
+    depends_on: [db]
+volumes: {freiraum_dev_db: {}}
