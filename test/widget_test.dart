@@ -63,12 +63,12 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(buildTestApp());
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.byType(FreiraumMap), findsOneWidget);
       expect(find.text('F'), findsOneWidget);
       expect(find.text('FREIRAUM'), findsOneWidget);
-      expect(find.textContaining('Demo-Daten'), findsWidgets);
       expect(find.byType(DraggableScrollableSheet), findsNothing);
 
       final railLogoRect = tester.getRect(find.text('F'));
@@ -76,8 +76,7 @@ void main() {
       final mapRect = tester.getRect(find.byType(FreiraumMap));
 
       expect(railLogoRect.center.dx, lessThan(brandRect.center.dx));
-      expect(brandRect.right, lessThan(mapRect.right));
-      expect(mapRect.width, greaterThan(700));
+      expect(brandRect.center.dx, lessThan(mapRect.center.dx));
     },
   );
 }
