@@ -1,5 +1,3 @@
-import 'package:intl/intl.dart';
-
 enum AccessType { offen, schranke, tor, tiefgarage, rezeption }
 
 enum VisualType {
@@ -77,17 +75,22 @@ class ParkingSpace {
     required this.availabilityStatus,
     required this.visual,
   });
+
   bool fits(Vehicle v) =>
       v.height <= maxHeight && v.width <= maxWidth && v.length <= maxLength;
+
   double total(int hours) => hourlyPrice * hours;
+
   String approximate() => '$district · nahe $landmark';
+
   String accessLabel() => switch (access) {
-    AccessType.offen => 'offen',
-    AccessType.schranke => 'Schranke',
-    AccessType.tor => 'Tor',
-    AccessType.tiefgarage => 'Tiefgarage',
-    AccessType.rezeption => 'Rezeption',
-  };
+        AccessType.offen => 'offen',
+        AccessType.schranke => 'Schranke',
+        AccessType.tor => 'Tor',
+        AccessType.tiefgarage => 'Tiefgarage',
+        AccessType.rezeption => 'Rezeption',
+      };
+
   String dimensions() =>
       'bis ${maxHeight.toStringAsFixed(2)} m Höhe · ${maxLength.toStringAsFixed(1)} m Länge';
 }
@@ -98,6 +101,7 @@ class SearchQuery {
   final Vehicle? vehicle;
   final Set<String> filters;
   final String sort;
+
   const SearchQuery({
     this.destination,
     required this.start,
@@ -106,9 +110,12 @@ class SearchQuery {
     this.filters = const {},
     this.sort = 'Empfohlen',
   });
+
   int get hours => end.difference(start).inHours.clamp(1, 24);
+
   bool get valid =>
       destination != null && vehicle != null && end.isAfter(start);
+
   SearchQuery copyWith({
     Destination? destination,
     DateTime? start,
@@ -116,17 +123,50 @@ class SearchQuery {
     Vehicle? vehicle,
     Set<String>? filters,
     String? sort,
-  }) => SearchQuery(
-    destination: destination ?? this.destination,
-    start: start ?? this.start,
-    end: end ?? this.end,
-    vehicle: vehicle ?? this.vehicle,
-    filters: filters ?? this.filters,
-    sort: sort ?? this.sort,
-  );
+  }) =>
+      SearchQuery(
+        destination: destination ?? this.destination,
+        start: start ?? this.start,
+        end: end ?? this.end,
+        vehicle: vehicle ?? this.vehicle,
+        filters: filters ?? this.filters,
+        sort: sort ?? this.sort,
+      );
+
   String summary() {
-    final df = DateFormat('E, d. MMM', 'de_DE');
-    final tf = DateFormat('HH:mm', 'de_DE');
-    return '${destination?.name ?? 'Wohin möchtest du?'} · ${df.format(start)} · ${tf.format(start)}–${tf.format(end)} · ${vehicle?.name ?? 'Fahrzeug wählen'}';
+    return '${destination?.name ?? 'Wohin möchtest du?'} · ${_dateLabel(start)} · ${_time(start)}–${_time(end)} · ${vehicle?.name ?? 'Fahrzeug wählen'}';
+  }
+
+  static String _time(DateTime value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  static String _dateLabel(DateTime value) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(value.year, value.month, value.day);
+
+    if (date == today) return 'Heute';
+    if (date == today.add(const Duration(days: 1))) return 'Morgen';
+
+    const weekdays = ['Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.', 'So.'];
+    const months = [
+      'Jan.',
+      'Feb.',
+      'März',
+      'Apr.',
+      'Mai',
+      'Juni',
+      'Juli',
+      'Aug.',
+      'Sept.',
+      'Okt.',
+      'Nov.',
+      'Dez.',
+    ];
+
+    return '${weekdays[value.weekday - 1]}, ${value.day}. ${months[value.month - 1]}';
   }
 }
