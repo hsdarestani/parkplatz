@@ -1,6 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freiraum_parking/features/booking/data/repositories.dart';
 import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';
+import 'package:freiraum_parking/features/parking/data/providers.dart';
 import 'package:freiraum_parking/features/search/data/demo_search_data.dart';
 import 'package:freiraum_parking/shared/models/models.dart';
 
@@ -53,5 +55,20 @@ void main() {
     expect(second, isNotEmpty);
     expect(second, isNot(first));
     expect(first, matches(RegExp(r'^[a-z0-9]+-[a-z0-9]+$')));
+  });
+  test('API repositories are available during startup health check', () {
+    final container = ProviderContainer(
+      overrides: [
+        appModeProvider.overrideWith(
+          (ref) => AppModeController.fixed(AppMode.checking),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    expect(
+      container.read(bookingRepositoryProvider),
+      isA<ApiBookingRepository>(),
+    );
   });
 }
