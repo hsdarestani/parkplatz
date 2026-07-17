@@ -1,1 +1,47 @@
-<!DOCTYPE html><html><head><base href="$FLUTTER_BASE_HREF"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="FREIRAUM – Parkplatz-Sharing Demo für Deutschland"><title>FREIRAUM · Ankommen, ohne zu suchen.</title><link rel="icon" href="favicon.svg" type="image/svg+xml"></head><body><script src="flutter_bootstrap.js" async></script></body></html>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="FREIRAUM – Parkplatz-Sharing Demo für Deutschland">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>FREIRAUM · Ankommen, ohne zu suchen.</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <script>
+    (async function () {
+      const resetKey = 'freiraum-service-worker-reset-20260717-v2';
+
+      try {
+        if ('serviceWorker' in navigator) {
+          const hadController = Boolean(navigator.serviceWorker.controller);
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+          }
+
+          if (hadController && sessionStorage.getItem(resetKey) !== 'done') {
+            sessionStorage.setItem(resetKey, 'done');
+            window.location.reload();
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('FREIRAUM cache reset warning:', error);
+      }
+
+      const script = document.createElement('script');
+      script.src = 'flutter_bootstrap.js?v=20260717-2';
+      script.async = true;
+      document.body.appendChild(script);
+    })();
+  </script>
+</body>
+</html>
