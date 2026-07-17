@@ -19,7 +19,15 @@ from app.models import (
     User,
     Vehicle,
 )
-from app.schemas.api import BookingIn, CancelIn, Login, Refresh, Register, VehicleIn
+from app.schemas.api import (
+    BookingIn,
+    CancelIn,
+    Login,
+    Refresh,
+    Register,
+    VehicleIn,
+    VehicleOut,
+)
 from app.services.auth import AuthService
 from app.services.booking import BookingService
 
@@ -224,37 +232,41 @@ async def availability(
     }
 
 
-@router.get("/vehicles")
+@router.get("/vehicles", response_model=list[VehicleOut])
 async def vehicles(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
-) -> list[Vehicle]:
+) -> list[VehicleOut]:
     result = await db.scalars(select(Vehicle).where(Vehicle.user_id == user_id))
-    return list(result.all())
+    return [VehicleOut.model_validate(vehicle) for vehicle in result.all()]
 
 
-@router.post("/vehicles", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/vehicles",
+    status_code=status.HTTP_201_CREATED,
+    response_model=VehicleOut,
+)
 async def add_vehicle(
     data: VehicleIn,
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
-) -> Vehicle:
+) -> VehicleOut:
     vehicle_data = data.model_dump()
     vehicle_data["plate"] = data.plate.upper().strip()
     vehicle = Vehicle(user_id=user_id, **vehicle_data)
     db.add(vehicle)
     await db.commit()
     await db.refresh(vehicle)
-    return vehicle
+    return VehicleOut.model_validate(vehicle)
 
 
-@router.patch("/vehicles/{vehicle_id}")
+@router.patch("/vehicles/{vehicle_id}", response_model=VehicleOut)
 async def patch_vehicle(
     vehicle_id: uuid.UUID,
     data: VehicleIn,
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
-) -> Vehicle:
+) -> VehicleOut:
     vehicle = await db.scalar(
         select(Vehicle).where(Vehicle.id == vehicle_id, Vehicle.user_id == user_id)
     )
@@ -266,7 +278,7 @@ async def patch_vehicle(
     vehicle.plate = vehicle.plate.upper().strip()
     await db.commit()
     await db.refresh(vehicle)
-    return vehicle
+    return VehicleOut.model_validate(vehicle)
 
 
 @router.delete("/vehicles/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
