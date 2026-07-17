@@ -132,6 +132,7 @@ jobs:
               'profile',
               'vehicles',
               'host',
+              'host/new',
           ):
               route_dir = build_dir / route
               route_dir.mkdir(parents=True, exist_ok=True)
@@ -200,7 +201,7 @@ jobs:
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
             | grep --fixed-strings "${GITHUB_SHA}"
 
-          for route in '' register/ login/ bookings/ discover/ search/ profile/ vehicles/ host/; do
+          for route in '' register/ login/ bookings/ discover/ search/ profile/ vehicles/ host/ host/new/; do
             headers="$(mktemp)"
             body="$(mktemp)"
             curl --fail --location --show-error --silent --retry 10 --retry-delay 3 \
