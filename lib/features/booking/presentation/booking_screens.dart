@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -29,7 +30,7 @@ String _date(DateTime date) {
   return '$day.$month.${date.year} · $hour:$minute';
 }
 
-class BetaScaffold extends StatelessWidget {
+class BetaScaffold extends ConsumerWidget {
   const BetaScaffold({
     super.key,
     required this.title,
@@ -42,7 +43,8 @@ class BetaScaffold extends StatelessWidget {
   final List<Widget>? actions;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(appModeProvider);
     return Scaffold(
       backgroundColor: T.porcelain,
       appBar: AppBar(
@@ -51,7 +53,7 @@ class BetaScaffold extends StatelessWidget {
       ),
       body: Column(
         children: [
-          Container(
+          if (mode == AppMode.localBeta) Container(
             width: double.infinity,
             color: T.amberSoft,
             padding: const EdgeInsets.all(12),
@@ -66,7 +68,18 @@ class BetaScaffold extends StatelessWidget {
                 ),
               ),
             ),
-          ),
+          ) else if (mode == AppMode.checking || mode == AppMode.unavailable)
+            Material(
+              color: T.inkSoft,
+              child: ListTile(
+                dense: true,
+                leading: mode == AppMode.checking
+                    ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.cloud_off, color: Colors.white),
+                title: Text(mode == AppMode.checking ? 'Verbindung zur FREIRAUM API wird geprüft …' : 'API nicht erreichbar.', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                trailing: mode == AppMode.unavailable ? TextButton(onPressed: ref.read(appModeProvider.notifier).check, child: const Text('Erneut versuchen')) : null,
+              ),
+            ),
           Expanded(child: child),
         ],
       ),
