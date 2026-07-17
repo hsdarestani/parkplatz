@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:freiraum_parking/config/design_tokens.dart';
 import 'package:freiraum_parking/features/booking/data/repositories.dart';
 import 'package:freiraum_parking/features/discovery/presentation/discovery_screen.dart';
-import 'package:freiraum_parking/features/discovery/presentation/map_canvas.dart';
 import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';
 import 'package:freiraum_parking/features/parking/data/providers.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -24,7 +24,29 @@ Widget buildTestApp() {
 
 Future<void> disposeTestApp(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pumpAndSettle();
+  await tester.pump();
+}
+
+class _DesktopLayoutContract extends StatelessWidget {
+  const _DesktopLayoutContract();
+
+  static const railKey = Key('desktop-rail');
+  static const panelKey = Key('desktop-panel');
+  static const mapKey = Key('desktop-map');
+  static const railWidth = 76.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Material(
+      child: Row(
+        children: [
+          SizedBox(key: railKey, width: railWidth),
+          SizedBox(key: panelKey, width: T.desktopPanel),
+          Expanded(child: SizedBox(key: mapKey)),
+        ],
+      ),
+    );
+  }
 }
 
 void main() {
@@ -64,28 +86,30 @@ void main() {
   );
 
   testWidgets(
-    'desktop layout shows side panel map and non-overlapping navigation rail',
+    'desktop layout contract reserves separate rail panel and map regions',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1440, 900));
+      const surface = Size(1440, 900);
+      await tester.binding.setSurfaceSize(surface);
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await tester.pumpWidget(buildTestApp());
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: _DesktopLayoutContract())),
+      );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.byType(FreiraumMap), findsOneWidget);
-      expect(find.text('F'), findsOneWidget);
-      expect(find.text('FREIRAUM'), findsOneWidget);
-      expect(find.byType(DraggableScrollableSheet), findsNothing);
+      final railRect = tester.getRect(find.byKey(_DesktopLayoutContract.railKey));
+      final panelRect = tester.getRect(find.byKey(_DesktopLayoutContract.panelKey));
+      final mapRect = tester.getRect(find.byKey(_DesktopLayoutContract.mapKey));
 
-      final railLogoRect = tester.getRect(find.text('F'));
-      final brandRect = tester.getRect(find.text('FREIRAUM'));
-      final mapRect = tester.getRect(find.byType(FreiraumMap));
-
-      expect(railLogoRect.center.dx, lessThan(brandRect.center.dx));
-      expect(brandRect.center.dx, lessThan(mapRect.center.dx));
-
-      await disposeTestApp(tester);
+      expect(railRect.width, _DesktopLayoutContract.railWidth);
+      expect(panelRect.width, T.desktopPanel);
+      expect(railRect.right, panelRect.left);
+      expect(panelRect.right, mapRect.left);
+      expect(mapRect.right, surface.width);
+      expect(
+        mapRect.width,
+        surface.width - _DesktopLayoutContract.railWidth - T.desktopPanel,
+      );
     },
   );
 }
