@@ -7,7 +7,7 @@ abstract class MapProvider {
 
 class OpenStreetMapProvider implements MapProvider {
   @override
-  String get attribution => '© OpenStreetMap-Mitwirkende · Demo-Daten';
+  String get attribution => '© OpenStreetMap-Mitwirkende';
 
   @override
   String get tileTemplate => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -16,5 +16,5 @@ class OpenStreetMapProvider implements MapProvider {
   List<String> get subdomains => const [];
 
   @override
-  String get userAgentPackageName => 'freiraum_parking_demo';
+  String get userAgentPackageName => 'freiraum_parking';
 }

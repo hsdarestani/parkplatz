@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config/environment.dart';
 import '../../../core/network/api_client.dart';
 import '../../../shared/models/models.dart';
+import '../../parking/data/demo_parking_repository.dart';
 
 abstract interface class TokenStorage implements ApiTokenStore {
   Future<void> replace(String access,String refresh);
@@ -24,9 +25,15 @@ class SecureTokenStorage implements TokenStorage {
 
 enum AppMode { checking, api, localBeta, unavailable }
 class AppModeController extends StateNotifier<AppMode> {
-  AppModeController(this.api):super(AppMode.checking){check();}
-  final ApiClient api;
-  Future<void> check() async {state=AppMode.checking; final healthy=await api.health(); state=healthy?AppMode.api:Environment.allowLocalBookingFallback?AppMode.localBeta:AppMode.unavailable;}
+  AppModeController(this.api) : super(AppMode.checking) { check(); }
+  AppModeController.fixed(AppMode mode) : api = null, super(mode);
+  final ApiClient? api;
+  Future<void> check() async {
+    if (api == null) return;
+    state = AppMode.checking;
+    final healthy = await api!.health();
+    state = healthy ? AppMode.api : Environment.allowLocalBookingFallback ? AppMode.localBeta : AppMode.unavailable;
+  }
 }
 final tokenStorageProvider=Provider<TokenStorage>((_)=>const SecureTokenStorage());
 final apiClientProvider=Provider<ApiClient>((ref)=>ApiClient(ref.watch(tokenStorageProvider)));
@@ -68,5 +75,72 @@ abstract interface class BookingRepository {Future<List<BookingRecord>> all();Fu
 class ApiBookingRepository implements BookingRepository {ApiBookingRepository(this.api);final ApiClient api;@override Future<List<BookingRecord>> all() async=>(await api.get('/bookings') as List).map((e)=>BookingRecord.fromJson(e)).toList();@override Future<BookingRecord?> detail(String id) async=>BookingRecord.fromJson(await api.get('/bookings/$id'));@override Future<BookingRecord> create(BookingRecord b) async=>BookingRecord.fromJson(await api.post('/bookings',body:{'parking_space_id':b.parkingId,'vehicle_id':b.vehicleId,'start_at':b.start.toIso8601String(),'end_at':b.end.toIso8601String(),'idempotency_key':'${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1<<32)}'}));@override Future<void> cancel(String id) async{await api.post('/bookings/$id/cancel',body:{'reason':'Vom Nutzer storniert'});}}
 class LocalBetaBookingRepository implements BookingRepository {static const _key='local_beta_bookings';@override Future<List<BookingRecord>> all() async=>(await SharedPreferences.getInstance()).getStringList(_key)?.map((e)=>BookingRecord.fromJson(jsonDecode(e),localBeta:true)).toList()??[];Future<void> _save(List<BookingRecord> v) async=>(await SharedPreferences.getInstance()).setStringList(_key,v.map((e)=>jsonEncode(e.toJson())).toList());@override Future<BookingRecord> create(BookingRecord b) async {final local=BookingRecord(id:b.id,parkingId:b.parkingId,title:b.title,reference:b.reference,vehicleId:b.vehicleId,plate:b.plate,status:b.status,start:b.start,end:b.end,hourlyPriceCents:b.hourlyPriceCents,totalCents:b.totalCents,localBeta:true);final v=await all();if(!v.any((e)=>e.id==b.id)){v.add(local);await _save(v);}return local;}@override Future<BookingRecord?> detail(String id) async {for(final b in await all()){if(b.id==id)return b;}return null;}@override Future<void> cancel(String id) async {final v=await all();await _save(v.map((e)=>e.id==id?e.cancelled():e).toList());}}
 
-class AvailabilityResult {const AvailabilityResult(this.available);final bool available;}
-class ApiAvailabilityRepository {ApiAvailabilityRepository(this.api);final ApiClient api;Future<AvailabilityResult> check(String id,DateTime start,DateTime end) async {final j=await api.get('/parking-spaces/$id/availability',query:{'start_at':start.toIso8601String(),'end_at':end.toIso8601String()},authenticated:false);return AvailabilityResult(j['available'] as bool);}}
+class AvailabilityResult {const AvailabilityResult(this.available,{this.message});final bool available;final String? message;}
+abstract interface class AvailabilityRepository {Future<AvailabilityResult> check(String id,DateTime start,DateTime end);}
+class ApiAvailabilityRepository implements AvailabilityRepository {ApiAvailabilityRepository(this.api);final ApiClient api;Future<AvailabilityResult> check(String id,DateTime start,DateTime end) async {final j=await api.get('/parking-spaces/$id/availability',query:{'start_at':start.toIso8601String(),'end_at':end.toIso8601String()},authenticated:false);return AvailabilityResult(j['available'] as bool,message:j['message'] as String?);}}
+class LocalAvailabilityRepository implements AvailabilityRepository {@override Future<AvailabilityResult> check(String id,DateTime start,DateTime end) async=>const AvailabilityResult(true);}
+
+
+class ApiParkingRepository implements ParkingRepository {
+  ApiParkingRepository(this.api);
+  final ApiClient api;
+
+  @override
+  Future<List<ParkingSpace>> all() async => (await api.get(
+        '/parking-spaces',
+        authenticated: false,
+      ) as List)
+          .map((value) => _parkingFromJson(value as Map<String, dynamic>))
+          .toList();
+
+  @override
+  Future<ParkingSpace?> byId(String id) async {
+    try {
+      return _parkingFromJson(await api.get(
+        '/parking-spaces/$id',
+        authenticated: false,
+      ) as Map<String, dynamic>);
+    } on ApiNotFoundException {
+      return null;
+    }
+  }
+}
+
+ParkingSpace _parkingFromJson(Map<String, dynamic> json) {
+  final access = switch (json['access_type']?.toString()) {
+    'barrier' || 'schranke' => AccessType.schranke,
+    'gate' || 'tor' => AccessType.tor,
+    'underground' || 'tiefgarage' => AccessType.tiefgarage,
+    'reception' || 'rezeption' => AccessType.rezeption,
+    _ => AccessType.offen,
+  };
+  return ParkingSpace(
+    id: json['id'].toString(),
+    title: json['title'] as String,
+    district: json['district'] as String,
+    landmark: json['landmark'] as String,
+    lat: (json['latitude'] as num).toDouble(),
+    lng: (json['longitude'] as num).toDouble(),
+    hourlyPrice: (json['hourly_price_cents'] as num).toDouble() / 100,
+    currency: (json['currency'] ?? 'EUR') as String,
+    walkingMeters: 500,
+    walkingMinutes: 7,
+    available: true,
+    instant: json['is_instant_bookable'] == true,
+    covered: json['is_covered'] == true,
+    ev: json['has_ev_charging'] == true,
+    accessible: json['is_accessible'] == true,
+    maxHeight: (json['max_height_m'] as num).toDouble(),
+    maxWidth: (json['max_width_m'] as num).toDouble(),
+    maxLength: (json['max_length_m'] as num).toDouble(),
+    access: access,
+    entranceSummary: 'Genaue Zufahrt nach bestätigter Buchung',
+    hostType: 'FREIRAUM Partner',
+    verified: json['is_verified'] == true,
+    rating: (json['rating'] as num).toDouble(),
+    reviewCount: json['review_count'] as int,
+    cancellationSummary: 'Stornierungsbedingungen werden vor Buchung bestätigt',
+    availabilityStatus: 'Verfügbarkeit wird live geprüft',
+    visual: json['is_covered'] == true ? VisualType.garage : VisualType.privateOutdoor,
+  );
+}
