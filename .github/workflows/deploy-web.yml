@@ -50,6 +50,8 @@ jobs:
     needs: backend
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DEPLOY_BACKEND_ENABLED: ${{ secrets.DEPLOY_BACKEND_ENABLED }}
 
     steps:
       - name: Checkout repository
@@ -110,11 +112,12 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/parkplatz/"
 
       - name: Deploy backend when enabled
-        if: ${{ secrets.DEPLOY_BACKEND_ENABLED == 'true' }}
+        if: env.DEPLOY_BACKEND_ENABLED == 'true'
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
+          set -euo pipefail
           rsync -az -e "ssh -i ~/.ssh/parkplatz_deploy" backend ops docker-compose.prod.yml \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/srv/parkplatz/"
           ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
