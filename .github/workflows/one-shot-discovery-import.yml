@@ -1,0 +1,46 @@
+name: One-shot discovery import repair
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Add missing AppMode import
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('lib/features/discovery/presentation/discovery_screen.dart')
+          text = path.read_text()
+          import_line = "import '../../booking/data/repositories.dart';\n"
+          anchor = "import '../../../config/design_tokens.dart';\n"
+          if import_line not in text:
+              if anchor not in text:
+                  raise SystemExit('Import anchor not found')
+              text = text.replace(anchor, anchor + import_line, 1)
+              path.write_text(text)
+          PY
+          rm -f .github/workflows/one-shot-discovery-import.yml
+
+      - name: Commit repair
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/discovery/presentation/discovery_screen.dart .github/workflows/one-shot-discovery-import.yml
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "fix: import app mode in discovery screen"
+          git push
