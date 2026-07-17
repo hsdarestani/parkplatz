@@ -13,7 +13,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: freiraum
+          POSTGRES_USER: freiraum
+          POSTGRES_PASSWORD: freiraum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U freiraum" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+psycopg://freiraum:freiraum@localhost:5432/freiraum
+      JWT_SECRET: ci-only-secret-not-used-in-production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[test]'
+      - run: ruff check app tests
+      - run: alembic upgrade head
+      - run: python -m app.db.seed && python -m app.db.seed
+      - run: pytest
+      - name: Build backend image
+        working-directory: .
+        run: docker build -t freiraum-api:${GITHUB_SHA} backend
+
   build-and-deploy:
+    needs: backend
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -32,6 +66,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -71,6 +108,18 @@ jobs:
             -e "ssh -i ~/.ssh/parkplatz_deploy" \
             build/web/ \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/parkplatz/"
+
+      - name: Deploy backend when enabled
+        if: ${{ secrets.DEPLOY_BACKEND_ENABLED == 'true' }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          rsync -az -e "ssh -i ~/.ssh/parkplatz_deploy" backend ops docker-compose.prod.yml \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/srv/parkplatz/"
+          ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            'cd /srv/parkplatz && ./ops/deploy-backend.sh'
+          curl --fail --retry 10 --retry-delay 3 https://parkplatz.smarbiz.sbs/api/health
 
       - name: Verify deployment
         run: |
