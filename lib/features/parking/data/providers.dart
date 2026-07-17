@@ -7,9 +7,10 @@ import 'demo_parking_repository.dart';
 
 T _forMode<T>(AppMode mode, T Function() api, T Function() local) {
   return switch (mode) {
-    AppMode.api => api(),
+    AppMode.checking || AppMode.api => api(),
     AppMode.localBeta => local(),
-    _ => throw StateError('Datenquelle ist noch nicht verfügbar.'),
+    AppMode.unavailable =>
+      throw StateError('Datenquelle ist noch nicht verfügbar.'),
   };
 }
 
@@ -17,7 +18,10 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final mode = ref.watch(appModeProvider);
   return _forMode(
     mode,
-    () => ApiAuthRepository(ref.watch(apiClientProvider), ref.watch(tokenStorageProvider)),
+    () => ApiAuthRepository(
+      ref.watch(apiClientProvider),
+      ref.watch(tokenStorageProvider),
+    ),
     LocalBetaAuthRepository.new,
   );
 });
@@ -65,7 +69,9 @@ final parkingSpacesProvider = FutureProvider<List<ParkingSpace>>((ref) async {
 
 final parkingResultsProvider = Provider<AsyncValue<List<ParkingSpace>>>((ref) {
   final query = ref.watch(searchProvider);
-  return ref.watch(parkingSpacesProvider).whenData((spaces) => filterParkingSpaces(spaces, query));
+  return ref
+      .watch(parkingSpacesProvider)
+      .whenData((spaces) => filterParkingSpaces(spaces, query));
 });
 
 final parkingSpaceProvider = FutureProvider.family<ParkingSpace?, String>((ref, id) {
@@ -74,5 +80,6 @@ final parkingSpaceProvider = FutureProvider.family<ParkingSpace?, String>((ref, 
 
 final selectedParkingIdProvider = StateProvider<String?>((ref) => null);
 
-final parkingResultsListProvider = Provider<List<ParkingSpace>>((ref) =>
-    ref.watch(parkingResultsProvider).valueOrNull ?? const []);
+final parkingResultsListProvider = Provider<List<ParkingSpace>>(
+  (ref) => ref.watch(parkingResultsProvider).valueOrNull ?? const [],
+);
