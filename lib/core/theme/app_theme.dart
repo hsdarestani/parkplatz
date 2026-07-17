@@ -42,7 +42,7 @@ ThemeData appTheme() {
       bodyLarge: TextStyle(height: 1.35),
       bodyMedium: TextStyle(height: 1.35),
     ),
-    appBarTheme: const AppBarTheme(
+    appBarTheme: const AppBarThemeData(
       backgroundColor: T.surface,
       foregroundColor: T.ink,
       elevation: 0,
@@ -84,7 +84,7 @@ ThemeData appTheme() {
         textStyle: const TextStyle(fontWeight: FontWeight.w800),
       ),
     ),
-    inputDecorationTheme: InputDecorationTheme(
+    inputDecorationTheme: InputDecorationThemeData(
       filled: true,
       fillColor: T.surfaceRaised,
       border: inputBorder,
@@ -98,14 +98,14 @@ ThemeData appTheme() {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       labelStyle: const TextStyle(color: T.muted, fontWeight: FontWeight.w700),
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: T.surface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(T.radius),
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: T.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
