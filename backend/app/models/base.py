@@ -68,6 +68,11 @@ class ParkingSpace(Timestamp, Base):
     __tablename__ = "parking_spaces"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     slug: Mapped[str] = mapped_column(unique=True, index=True)
     title: Mapped[str]
     district: Mapped[str]
