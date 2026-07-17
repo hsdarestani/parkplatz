@@ -3,14 +3,14 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/bootstrap.dart';
-import 'app/url_strategy.dart';
 
 Future<void> main() async {
+  usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
-  configureUrlStrategy();
   await initializeDateFormatting('de_DE');
 
   ErrorWidget.builder = (details) => Material(
