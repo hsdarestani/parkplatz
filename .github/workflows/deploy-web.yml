@@ -39,8 +39,8 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build Flutter Web
-        run: flutter build web --release --base-href /
+      - name: Build Flutter Web without PWA service-worker cache
+        run: flutter build web --release --base-href / --pwa-strategy=none
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -75,5 +75,5 @@ jobs:
       - name: Verify deployment
         run: |
           curl --fail --show-error --silent --retry 10 --retry-delay 3 \
-            https://parkplatz.smarbiz.sbs/ > /dev/null
+            "https://parkplatz.smarbiz.sbs/?deploy=${GITHUB_SHA}" > /dev/null
           echo "Deployment verified: https://parkplatz.smarbiz.sbs/"
