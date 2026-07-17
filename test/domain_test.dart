@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:freiraum_parking/features/booking/data/repositories.dart';
 import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';
 import 'package:freiraum_parking/features/search/data/demo_search_data.dart';
 import 'package:freiraum_parking/shared/models/models.dart';
@@ -19,13 +20,38 @@ void main() {
     expect(space.fits(demoVehicles[2]), isFalse);
   });
   test('filters and sorting update results', () {
-    final query = SearchQuery(destination: demoDestinations.first, start: DateTime(2026, 7, 17, 18), end: DateTime(2026, 7, 17, 22), vehicle: demoVehicles.first, filters: {'ev', 'covered', 'fit'}, sort: 'Preis');
-    final results = filterParkingSpaces(DemoParkingRepository.spaces, query);
-    expect(results.every((space) => space.ev && space.covered && space.fits(demoVehicles.first)), isTrue);
+    final query = SearchQuery(
+      destination: demoDestinations.first,
+      start: DateTime(2026, 7, 17, 18),
+      end: DateTime(2026, 7, 17, 22),
+      vehicle: demoVehicles.first,
+      filters: {'ev', 'covered', 'fit'},
+      sort: 'Preis',
+    );
+    final results = filterParkingSpaces(
+      DemoParkingRepository.spaces,
+      query,
+    );
+    expect(
+      results.every(
+        (space) =>
+            space.ev && space.covered && space.fits(demoVehicles.first),
+      ),
+      isTrue,
+    );
     expect(results.first.hourlyPrice <= results.last.hourlyPrice, isTrue);
   });
   test('UUID parking IDs are preserved by repository lookup', () async {
     const uuid = '7cc92f53-f948-4c18-8c15-68220f915f11';
     expect(await DemoParkingRepository().byId(uuid), isNull);
+  });
+  test('booking idempotency keys are web safe and unique', () {
+    final first = createBookingIdempotencyKey();
+    final second = createBookingIdempotencyKey();
+
+    expect(first, isNotEmpty);
+    expect(second, isNotEmpty);
+    expect(second, isNot(first));
+    expect(first, matches(RegExp(r'^[a-z0-9]+-[a-z0-9]+$')));
   });
 }
