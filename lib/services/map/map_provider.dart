@@ -1,0 +1,1 @@
+abstract class MapProvider{String get attribution;String get tileTemplate;}class OpenStreetMapProvider implements MapProvider{String get attribution=>'© OpenStreetMap-Mitwirkende · Demo-Daten';String get tileTemplate=>'https://tile.openstreetmap.org/{z}/{x}/{y}.png';}

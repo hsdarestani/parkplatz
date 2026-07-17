@@ -1,0 +1,15 @@
+# FREIRAUM Codex Instructions
+- Every task must produce a visible, reviewable product change.
+- Do not complete tasks with infrastructure-only work unless explicitly requested.
+- Preserve Flutter support for iOS, Android and Web.
+- Preserve the established FREIRAUM design language; avoid default Material and generic template visuals.
+- Visible product copy remains German unless explicitly changed.
+- No important visible button may remain dead.
+- Exact private address must never appear before confirmed booking.
+- Prices must be transparent and all demo behavior must be distinguished from production behavior.
+- Manual destination search must work without location permission.
+- Background location is forbidden unless explicitly approved later.
+- Reuse design tokens and shared components; maintain responsive mobile and desktop behavior.
+- Run format, analyze, tests and web build before completion.
+- Report exactly which visible routes and interactions changed.
+- Avoid large refactors unless the current visible task requires them.
