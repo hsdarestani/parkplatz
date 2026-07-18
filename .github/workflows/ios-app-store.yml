@@ -1,0 +1,114 @@
+name: Prepare FREIRAUM iOS App Store Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'tool/prepare_ios_release.py'
+      - '.github/workflows/ios-app-store.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parkplatz-ios-app-store
+  cancel-in-progress: true
+
+jobs:
+  ios-release-validation:
+    runs-on: macos-26
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Select App Store compatible Xcode
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_26.4.1.app/Contents/Developer
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Generate clean iOS project
+        run: |
+          set -euo pipefail
+          rm -rf ios
+          flutter create \
+            --platforms=ios \
+            --org de.freiraum \
+            --project-name freiraum_parking \
+            .
+
+      - name: Prepare App Store configuration and icon set
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pillow
+          python3 tool/prepare_ios_release.py
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+      - name: Build unsigned iPhone release
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
+            --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
+
+      - name: Verify native release bundle
+        run: |
+          set -euo pipefail
+          APP=build/ios/iphoneos/Runner.app
+          test -d "$APP"
+          test -f "$APP/Info.plist"
+          test -f "$APP/Frameworks/App.framework/App"
+
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
+          DISPLAY_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist")"
+          ENCRYPTION="$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP/Info.plist")"
+
+          test "$BUNDLE_ID" = "de.freiraum.parking"
+          test "$DISPLAY_NAME" = "FREIRAUM"
+          test "$ENCRYPTION" = "false"
+          echo "Validated $DISPLAY_NAME ($BUNDLE_ID) with Xcode $(xcodebuild -version | head -1)."
+
+      - name: Package unsigned validation artifact
+        run: |
+          set -euo pipefail
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/ios/iphoneos/Runner.app \
+            FREIRAUM-iOS-0.9.0-unsigned.zip
+
+      - name: Upload iOS validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: freiraum-ios-0.9.0-${{ github.sha }}
+          path: |
+            FREIRAUM-iOS-0.9.0-unsigned.zip
+            ios/Runner/Info.plist
+            ios/Runner/Assets.xcassets/AppIcon.appiconset
+          retention-days: 14
+          if-no-files-found: error
