@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
-import 'payment_repository.dart';
+import '../../booking/data/repositories.dart';
 
 class HostSubscription {
   const HostSubscription({
