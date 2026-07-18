@@ -27,9 +27,6 @@ from app.services.booking import BookingService
 from app.services.payments import payment_out
 
 
-DIRECT_ACTIVE_STATUSES = {"awaiting_payment", "awaiting_host_confirmation", "paid"}
-
-
 def direct_settings_out(value: HostDirectPaymentSettings | None) -> dict[str, Any]:
     return {
         "method": value.method if value else "paypal",
@@ -101,8 +98,24 @@ class DirectPaymentService:
             confirm_immediately=False,
         )
         parking_space = await db.get(ParkingSpace, booking.parking_space_id)
-        if parking_space is None or parking_space.owner_id is None:
+        if parking_space is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        if parking_space.owner_id is None:
+            await BookingService.expire_pending(
+                db,
+                booking,
+                reason="demo_space_not_bookable",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "demo_space_not_bookable",
+                    "message": (
+                        "Dieser Demo-Stellplatz ist noch nicht buchbar. "
+                        "Bitte wähle ein Angebot eines registrierten Anbieters."
+                    ),
+                },
+            )
 
         destination = await db.get(
             HostDirectPaymentSettings,
