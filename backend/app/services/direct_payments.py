@@ -1,0 +1,353 @@
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.models import (
+    Booking,
+    BookingEvent,
+    BookingStatus,
+    HostDirectPaymentSettings,
+    ParkingSpace,
+    Payment,
+    User,
+    Vehicle,
+)
+from app.schemas.api import BookingIn
+from app.schemas.direct_payment import (
+    DirectPaymentDecisionIn,
+    DirectPaymentReferenceIn,
+    DirectPaymentSettingsIn,
+)
+from app.services.booking import BookingService
+from app.services.payments import payment_out
+
+
+DIRECT_ACTIVE_STATUSES = {"awaiting_payment", "awaiting_host_confirmation", "paid"}
+
+
+def direct_settings_out(value: HostDirectPaymentSettings | None) -> dict[str, Any]:
+    return {
+        "method": value.method if value else "paypal",
+        "payment_url": value.payment_url if value else None,
+        "iban": value.iban if value else None,
+        "account_holder": value.account_holder if value else None,
+        "instructions": value.instructions if value else None,
+        "enabled": value.enabled if value else False,
+        "configured": value is not None and value.enabled,
+    }
+
+
+def direct_instructions(
+    value: HostDirectPaymentSettings,
+    booking: Booking,
+) -> dict[str, Any]:
+    return {
+        **direct_settings_out(value),
+        "payment_reference": booking.public_reference,
+        "amount_cents": booking.total_price_cents,
+        "currency": booking.currency,
+    }
+
+
+class DirectPaymentService:
+    @staticmethod
+    async def settings(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        value = await db.get(HostDirectPaymentSettings, user_id)
+        return direct_settings_out(value)
+
+    @staticmethod
+    async def save_settings(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        data: DirectPaymentSettingsIn,
+    ) -> dict[str, Any]:
+        value = await db.get(HostDirectPaymentSettings, user_id)
+        if value is None:
+            value = HostDirectPaymentSettings(user_id=user_id)
+            db.add(value)
+
+        value.method = data.method
+        value.payment_url = data.payment_url.strip() if data.payment_url else None
+        value.iban = (
+            data.iban.replace(" ", "").upper().strip() if data.iban else None
+        )
+        value.account_holder = (
+            data.account_holder.strip() if data.account_holder else None
+        )
+        value.instructions = data.instructions.strip() if data.instructions else None
+        value.enabled = data.enabled
+        await db.commit()
+        await db.refresh(value)
+        return direct_settings_out(value)
+
+    @staticmethod
+    async def create_checkout(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        data: BookingIn,
+    ) -> dict[str, Any]:
+        booking = await BookingService.create(
+            db,
+            user_id,
+            data,
+            confirm_immediately=False,
+        )
+        parking_space = await db.get(ParkingSpace, booking.parking_space_id)
+        if parking_space is None or parking_space.owner_id is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+        destination = await db.get(
+            HostDirectPaymentSettings,
+            parking_space.owner_id,
+        )
+        if destination is None or not destination.enabled:
+            await BookingService.expire_pending(
+                db,
+                booking,
+                reason="host_payment_not_ready",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "host_payment_not_ready",
+                    "message": (
+                        "Dieser Anbieter hat noch keine direkte Zahlungsmethode "
+                        "hinterlegt."
+                    ),
+                },
+            )
+
+        existing = await db.scalar(
+            select(Payment).where(Payment.booking_id == booking.id)
+        )
+        if existing is not None and existing.provider == "direct":
+            return {
+                "requires_redirect": False,
+                "booking_id": str(booking.id),
+                "payment": payment_out(existing),
+                "direct_payment": direct_instructions(destination, booking),
+            }
+
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            hours=max(settings.direct_payment_hold_hours, 1)
+        )
+        payment = existing or Payment(
+            booking_id=booking.id,
+            payer_user_id=user_id,
+            host_user_id=parking_space.owner_id,
+            provider="direct",
+            status="awaiting_payment",
+            amount_cents=booking.total_price_cents,
+            platform_fee_cents=0,
+            host_net_cents=booking.total_price_cents,
+            currency=booking.currency,
+        )
+        payment.provider = "direct"
+        payment.status = "awaiting_payment"
+        payment.amount_cents = booking.total_price_cents
+        payment.platform_fee_cents = 0
+        payment.host_net_cents = booking.total_price_cents
+        payment.currency = booking.currency
+        payment.payment_method = destination.method
+        payment.checkout_url = destination.payment_url
+        payment.expires_at = expires_at
+        payment.payer_reference = None
+        payment.submitted_at = None
+        payment.host_confirmed_at = None
+        payment.rejected_at = None
+        payment.failure_message = None
+        db.add(payment)
+        await db.commit()
+        await db.refresh(payment)
+        return {
+            "requires_redirect": False,
+            "booking_id": str(booking.id),
+            "payment": payment_out(payment),
+            "direct_payment": direct_instructions(destination, booking),
+        }
+
+    @staticmethod
+    async def submit_reference(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        booking_id: uuid.UUID,
+        data: DirectPaymentReferenceIn,
+    ) -> dict[str, Any]:
+        booking = await db.scalar(
+            select(Booking)
+            .where(Booking.id == booking_id, Booking.user_id == user_id)
+            .with_for_update()
+        )
+        if booking is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        payment = await db.scalar(
+            select(Payment).where(
+                Payment.booking_id == booking.id,
+                Payment.provider == "direct",
+            )
+        )
+        if payment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        if booking.status != BookingStatus.pending or payment.status not in {
+            "awaiting_payment",
+            "awaiting_host_confirmation",
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "payment_not_submittable",
+                    "message": "Diese Zahlung kann nicht mehr eingereicht werden.",
+                },
+            )
+        now = datetime.now(timezone.utc)
+        if payment.expires_at is not None and payment.expires_at <= now:
+            payment.status = "expired"
+            await BookingService.expire_pending(
+                db,
+                booking,
+                reason="direct_payment_expired",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "payment_expired",
+                    "message": "Die Zahlungsfrist ist abgelaufen.",
+                },
+            )
+
+        payment.payer_reference = data.reference.strip()
+        payment.submitted_at = now
+        payment.status = "awaiting_host_confirmation"
+        db.add(
+            BookingEvent(
+                booking_id=booking.id,
+                event_type="direct_payment_submitted",
+                event_metadata={"reference": payment.payer_reference},
+            )
+        )
+        await db.commit()
+        await db.refresh(payment)
+        return {
+            "booking_id": str(booking.id),
+            "payment": payment_out(payment),
+        }
+
+    @staticmethod
+    async def pending_for_host(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+    ) -> list[dict[str, Any]]:
+        rows = (
+            await db.execute(
+                select(Payment, Booking, ParkingSpace, User, Vehicle)
+                .join(Booking, Booking.id == Payment.booking_id)
+                .join(ParkingSpace, ParkingSpace.id == Booking.parking_space_id)
+                .join(User, User.id == Payment.payer_user_id)
+                .join(Vehicle, Vehicle.id == Booking.vehicle_id)
+                .where(
+                    Payment.host_user_id == user_id,
+                    Payment.provider == "direct",
+                    Payment.status == "awaiting_host_confirmation",
+                )
+                .order_by(Payment.submitted_at.asc())
+            )
+        ).all()
+        return [
+            {
+                "payment_id": str(payment.id),
+                "booking_id": str(booking.id),
+                "booking_reference": booking.public_reference,
+                "parking_title": parking_space.title,
+                "renter_name": renter.display_name,
+                "renter_email": renter.email,
+                "vehicle_plate": vehicle.plate,
+                "start_at": booking.start_at,
+                "end_at": booking.end_at,
+                "amount_cents": payment.amount_cents,
+                "currency": payment.currency,
+                "payment_method": payment.payment_method,
+                "payer_reference": payment.payer_reference,
+                "submitted_at": payment.submitted_at,
+            }
+            for payment, booking, parking_space, renter, vehicle in rows
+        ]
+
+    @staticmethod
+    async def decide(
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        payment_id: uuid.UUID,
+        data: DirectPaymentDecisionIn,
+    ) -> dict[str, Any]:
+        row = (
+            await db.execute(
+                select(Payment, Booking, ParkingSpace)
+                .join(Booking, Booking.id == Payment.booking_id)
+                .join(ParkingSpace, ParkingSpace.id == Booking.parking_space_id)
+                .where(
+                    Payment.id == payment_id,
+                    Payment.host_user_id == user_id,
+                    ParkingSpace.owner_id == user_id,
+                    Payment.provider == "direct",
+                )
+                .with_for_update()
+            )
+        ).one_or_none()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        payment, booking, _parking_space = row
+        if payment.status != "awaiting_host_confirmation":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "payment_already_decided",
+                    "message": "Diese Zahlung wurde bereits bearbeitet.",
+                },
+            )
+
+        now = datetime.now(timezone.utc)
+        if data.decision == "confirm":
+            payment.status = "paid"
+            payment.paid_at = now
+            payment.host_confirmed_at = now
+            payment.failure_message = None
+            await BookingService.confirm_paid(
+                db,
+                booking,
+                payment_reference=(payment.payer_reference or str(payment.id)),
+            )
+        else:
+            payment.status = "rejected"
+            payment.rejected_at = now
+            payment.failure_message = (
+                data.reason.strip()
+                if data.reason
+                else "Zahlung vom Anbieter nicht bestätigt."
+            )
+            db.add(
+                BookingEvent(
+                    booking_id=booking.id,
+                    event_type="direct_payment_rejected",
+                    event_metadata={"reason": payment.failure_message},
+                )
+            )
+            await BookingService.expire_pending(
+                db,
+                booking,
+                reason="direct_payment_rejected",
+            )
+
+        await db.refresh(payment)
+        return {
+            "booking_id": str(booking.id),
+            "payment": payment_out(payment),
+            "booking_status": booking.status,
+        }
