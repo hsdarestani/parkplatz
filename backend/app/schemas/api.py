@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class Register(BaseModel):
@@ -73,6 +73,43 @@ class HostParkingSpaceIn(BaseModel):
 
 class HostParkingStatusIn(BaseModel):
     status: Literal["active", "paused"]
+
+
+class HostAvailabilityRuleIn(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    active: bool = True
+    start_time: time = time(0, 0)
+    end_time: time = time(23, 59)
+    price_override_cents: int | None = Field(default=None, ge=50, le=100_000)
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "HostAvailabilityRuleIn":
+        if self.active and self.end_time <= self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
+
+
+class HostAvailabilityScheduleIn(BaseModel):
+    rules: list[HostAvailabilityRuleIn] = Field(min_length=7, max_length=7)
+
+    @model_validator(mode="after")
+    def validate_unique_weekdays(self) -> "HostAvailabilityScheduleIn":
+        weekdays = [rule.weekday for rule in self.rules]
+        if sorted(weekdays) != list(range(7)):
+            raise ValueError("rules must contain every weekday exactly once")
+        return self
+
+
+class HostAvailabilityBlockIn(BaseModel):
+    start_at: datetime
+    end_at: datetime
+    reason: str | None = Field(default=None, max_length=240)
+
+    @model_validator(mode="after")
+    def validate_range(self) -> "HostAvailabilityBlockIn":
+        if self.end_at <= self.start_at:
+            raise ValueError("end_at must be after start_at")
+        return self
 
 
 class BookingIn(BaseModel):
