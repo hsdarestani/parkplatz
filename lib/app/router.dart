@@ -15,6 +15,11 @@ import '../features/launch/launch_screen.dart';
 import '../features/payment/presentation/host_finance_screen.dart';
 import '../features/payment/presentation/payment_checkout_screen.dart';
 import '../features/payment/presentation/payment_return_screen.dart';
+import '../features/trust/presentation/admin_trust_screen.dart';
+import '../features/trust/presentation/legal_screen.dart';
+import '../features/trust/presentation/support_request_screen.dart';
+import '../features/trust/presentation/trust_center_screen.dart';
+import '../features/trust/presentation/verification_screen.dart';
 import '../shared/widgets/authenticated_route_guard.dart';
 
 AuthenticatedRouteGuard _protected(String path, Widget child) =>
@@ -129,6 +134,32 @@ GoRouter createRouter() => GoRouter(
               HostManageScreen(id: state.pathParameters['id']!),
             );
           },
+        ),
+        GoRoute(
+          path: '/trust',
+          builder: (context, state) =>
+              _protected('/trust', const TrustCenterScreen()),
+        ),
+        GoRoute(
+          path: '/trust/verification',
+          builder: (context, state) =>
+              _protected('/trust/verification', const VerificationScreen()),
+        ),
+        GoRoute(
+          path: '/trust/support',
+          builder: (context, state) =>
+              _protected('/trust/support', const SupportRequestScreen()),
+        ),
+        GoRoute(
+          path: '/admin/trust',
+          builder: (context, state) =>
+              _protected('/admin/trust', const AdminTrustScreen()),
+        ),
+        GoRoute(
+          path: '/legal/:section',
+          builder: (context, state) => LegalScreen(
+            section: state.pathParameters['section'] ?? 'privacy',
+          ),
         ),
       ],
     );
