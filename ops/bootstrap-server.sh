@@ -40,6 +40,12 @@ ensure_env PUBLIC_APP_URL https://parkplatz.smarbiz.sbs
 ensure_env PLATFORM_FEE_BASIS_POINTS 1500
 ensure_env PAYMENT_HOLD_MINUTES 31
 ensure_env DIRECT_PAYMENT_HOLD_HOURS 24
+ensure_env FREE_HOST_RESPONSE_HOURS 12
+ensure_env PRO_HOST_RESPONSE_HOURS 6
+ensure_env FREE_LISTING_LIMIT 1
+ensure_env PRO_LISTING_LIMIT 10
+ensure_env RECEIPT_UPLOAD_DIR /var/lib/freiraum/uploads
+ensure_env RECEIPT_MAX_BYTES 5242880
 ensure_env STRIPE_COUNTRY DE
 ensure_env STRIPE_SECRET_KEY ""
 ensure_env STRIPE_WEBHOOK_SECRET ""
@@ -52,17 +58,21 @@ sed -i 's/^PAYMENT_MODE=beta$/PAYMENT_MODE=direct/' .env.production
 ensure_env ADMIN_EMAILS ""
 ensure_env TRUST_SUPPORT_EMAIL info@aplus-solution.de
 
-# Email delivery stays in outbox mode until an SMTP server is configured.
-ensure_env EMAIL_MODE outbox
+# EMAIL_MODE=auto starts real delivery as soon as SMTP_HOST is configured.
+ensure_env EMAIL_MODE auto
 ensure_env SMTP_HOST ""
 ensure_env SMTP_PORT 587
+ensure_env SMTP_USERNAME ""
+ensure_env SMTP_PASSWORD ""
 ensure_env SMTP_FROM_EMAIL info@aplus-solution.de
 ensure_env SMTP_FROM_NAME FREIRAUM
+ensure_env SMTP_SSL false
 ensure_env SMTP_STARTTLS true
 ensure_env NOTIFICATION_POLL_SECONDS 15
 ensure_env PASSWORD_RESET_MINUTES 30
 
-# Replace the earlier placeholder support address on existing installations.
+# Upgrade installations that still use the former outbox-only default.
+sed -i 's/^EMAIL_MODE=outbox$/EMAIL_MODE=auto/' .env.production
 sed -i 's/^TRUST_SUPPORT_EMAIL=support@freiraum\.app$/TRUST_SUPPORT_EMAIL=info@aplus-solution.de/' .env.production
 
 # Stripe requires Checkout expiration to be at least 30 minutes in the future.
