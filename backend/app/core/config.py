@@ -9,10 +9,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     version: str = "0.1.0"
 
-    payment_mode: str = "beta"
+    payment_mode: str = "direct"
     public_app_url: str = "http://localhost:8080"
     platform_fee_basis_points: int = 1500
     payment_hold_minutes: int = 31
+    direct_payment_hold_hours: int = 24
     password_reset_minutes: int = 30
 
     stripe_secret_key: str = ""
