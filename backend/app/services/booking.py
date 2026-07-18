@@ -33,6 +33,20 @@ def normalize_booking_time(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def ensure_not_self_booking(
+    parking_space: ParkingSpace,
+    user_id: uuid.UUID,
+) -> None:
+    if parking_space.owner_id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "self_booking_not_allowed",
+                "message": "Du kannst deinen eigenen Stellplatz nicht buchen.",
+            },
+        )
+
+
 class BookingService:
     @staticmethod
     async def create(
@@ -94,6 +108,8 @@ class BookingService:
                     "message": "Stellplatz oder Fahrzeug nicht gefunden.",
                 },
             )
+
+        ensure_not_self_booking(parking_space, user_id)
 
         vehicle_does_not_fit = any(
             (
