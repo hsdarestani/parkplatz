@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/account/presentation/account_controls_screen.dart';
+import '../features/account/presentation/password_recovery_screens.dart';
 import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
 import '../features/booking/presentation/booking_screens.dart';
@@ -56,6 +58,16 @@ GoRouter createRouter() => GoRouter(
           ),
         ),
         GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) => const ForgotPasswordScreen(),
+        ),
+        GoRoute(
+          path: '/reset-password',
+          builder: (context, state) => ResetPasswordScreen(
+            token: state.uri.queryParameters['token'] ?? '',
+          ),
+        ),
+        GoRoute(
           path: '/checkout/:id',
           builder: (context, state) {
             final path = '/checkout/${state.pathParameters['id']}';
@@ -104,6 +116,11 @@ GoRouter createRouter() => GoRouter(
           path: '/profile',
           builder: (context, state) =>
               _protected('/profile', const ProfileScreen()),
+        ),
+        GoRoute(
+          path: '/account/security',
+          builder: (context, state) =>
+              _protected('/account/security', const AccountControlsScreen()),
         ),
         GoRoute(
           path: '/vehicles',
