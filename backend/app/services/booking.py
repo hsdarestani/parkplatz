@@ -33,11 +33,18 @@ def normalize_booking_time(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def is_self_booking(
+    parking_space: ParkingSpace,
+    user_id: uuid.UUID,
+) -> bool:
+    return parking_space.owner_id == user_id
+
+
 def ensure_not_self_booking(
     parking_space: ParkingSpace,
     user_id: uuid.UUID,
 ) -> None:
-    if parking_space.owner_id == user_id:
+    if is_self_booking(parking_space, user_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
