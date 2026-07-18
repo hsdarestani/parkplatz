@@ -191,9 +191,8 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}:/srv/parkplatz/"
           ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
             'cd /srv/parkplatz && ./ops/deploy-backend.sh'
-          curl --fail --retry 10 --retry-delay 3 https://parkplatz.smarbiz.sbs/api/health
 
-      - name: Verify deployment and direct route entrypoints
+      - name: Verify deployment, routes, and production API
         run: |
           set -euo pipefail
 
@@ -213,4 +212,24 @@ jobs:
             rm -f "$headers" "$body"
           done
 
-          echo "Deployment and HTML direct routes verified: https://parkplatz.smarbiz.sbs/"
+          curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+            "https://parkplatz.smarbiz.sbs/api/health?deploy=${GITHUB_SHA}" \
+            > /tmp/freiraum-public-health.json
+          curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+            "https://parkplatz.smarbiz.sbs/api/parking-spaces?deploy=${GITHUB_SHA}" \
+            > /tmp/freiraum-public-spaces.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path('/tmp/freiraum-public-health.json').read_text())
+          spaces = json.loads(Path('/tmp/freiraum-public-spaces.json').read_text())
+          if health.get('status') != 'ok' or health.get('database') != 'connected':
+              raise SystemExit(f'Production API health is degraded: {health}')
+          if not isinstance(spaces, list):
+              raise SystemExit('Production parking-spaces endpoint did not return a list')
+          print(f'Production API ready with {len(spaces)} parking spaces.')
+          PY
+
+          echo "Deployment, direct routes, and production API verified."
