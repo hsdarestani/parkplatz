@@ -18,11 +18,22 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_country: str = "DE"
 
+    admin_emails: str = ""
+    trust_support_email: str = "support@freiraum.app"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
     def stripe_enabled(self) -> bool:
         return self.payment_mode == "stripe" and bool(self.stripe_secret_key)
+
+    @property
+    def admin_email_set(self) -> set[str]:
+        return {
+            email.strip().lower()
+            for email in self.admin_emails.split(",")
+            if email.strip()
+        }
 
 
 settings = Settings()
