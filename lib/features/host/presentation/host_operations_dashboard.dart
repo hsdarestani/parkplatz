@@ -38,6 +38,11 @@ class _HostOperationsDashboardState
         subtitle: 'Angebote, Buchungen, Preise und Verfügbarkeit verwalten.',
         activePath: '/host',
         actions: [
+          OutlinedButton.icon(
+            onPressed: () => context.go('/host/finance'),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            label: const Text('Finanzen'),
+          ),
           FilledButton.icon(
             onPressed: () => context.go('/host/new'),
             icon: const Icon(Icons.add),
@@ -105,7 +110,7 @@ class _HostOperationsDashboardState
                         ),
                         HostMetricCard(
                           '${euros(earnings)} €',
-                          'Beta-Umsatz',
+                          'Buchungsumsatz',
                           icon: Icons.payments_outlined,
                         ),
                       ],
@@ -172,7 +177,7 @@ class _HostOperationsDashboardState
               size: 54,
             ),
             const SizedBox(
-              width: 620,
+              width: 570,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -186,16 +191,16 @@ class _HostOperationsDashboardState
                   ),
                   SizedBox(height: 6),
                   Text(
-                    'Bearbeite Angebote, steuere Wochenpläne, Sperrzeiten und dynamische Preise.',
+                    'Bearbeite Angebote, steuere Verfügbarkeit und behalte Zahlungen und Auszahlungen im Blick.',
                     style: TextStyle(color: Colors.white70),
                   ),
                 ],
               ),
             ),
             FilledButton.tonalIcon(
-              onPressed: () => context.go('/host/new'),
-              icon: const Icon(Icons.add),
-              label: const Text('Neuen Stellplatz anlegen'),
+              onPressed: () => context.go('/host/finance'),
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: const Text('Finanzen öffnen'),
             ),
           ],
         ),
