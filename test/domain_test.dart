@@ -4,6 +4,7 @@ import 'package:freiraum_parking/features/booking/data/repositories.dart';
 import 'package:freiraum_parking/features/host/data/host_repository.dart';
 import 'package:freiraum_parking/features/parking/data/demo_parking_repository.dart';
 import 'package:freiraum_parking/features/parking/data/providers.dart';
+import 'package:freiraum_parking/features/payment/data/payment_aware_booking_repository.dart';
 import 'package:freiraum_parking/features/search/data/demo_search_data.dart';
 import 'package:freiraum_parking/shared/models/models.dart';
 
@@ -72,8 +73,10 @@ void main() {
     );
     addTearDown(container.dispose);
 
+    final repository = container.read(bookingRepositoryProvider);
+    expect(repository, isA<PaymentAwareBookingRepository>());
     expect(
-      container.read(bookingRepositoryProvider),
+      (repository as PaymentAwareBookingRepository).delegate,
       isA<ApiBookingRepository>(),
     );
   });
