@@ -16,28 +16,17 @@ FRANKFURT_TIMEZONE = ZoneInfo("Europe/Berlin")
 
 
 def normalize_booking_time(value: datetime) -> datetime:
-    """Return a timezone-aware UTC timestamp for booking comparisons and storage.
-
-    Current Flutter Web clients may send a local wall-clock value without an
-    offset. Since the MVP operates in Frankfurt, interpret those legacy values
-    in Europe/Berlin. Offset-aware clients keep their original instant.
-    """
+    """Return a timezone-aware UTC timestamp for booking storage and comparison."""
     if value.utcoffset() is None:
         value = value.replace(tzinfo=FRANKFURT_TIMEZONE)
     return value.astimezone(timezone.utc)
 
 
-def is_self_booking(
-    parking_space: ParkingSpace,
-    user_id: uuid.UUID,
-) -> bool:
+def is_self_booking(parking_space: ParkingSpace, user_id: uuid.UUID) -> bool:
     return parking_space.owner_id == user_id
 
 
-def ensure_not_self_booking(
-    parking_space: ParkingSpace,
-    user_id: uuid.UUID,
-) -> None:
+def ensure_not_self_booking(parking_space: ParkingSpace, user_id: uuid.UUID) -> None:
     if is_self_booking(parking_space, user_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -54,6 +43,8 @@ class BookingService:
         db: AsyncSession,
         user_id: uuid.UUID,
         data: BookingIn,
+        *,
+        confirm_immediately: bool = True,
     ) -> Booking:
         previous_booking = await db.scalar(
             select(Booking).where(
@@ -150,28 +141,90 @@ class BookingService:
             vehicle_id=vehicle.id,
             start_at=start_at,
             end_at=end_at,
-            status=BookingStatus.confirmed,
+            status=(
+                BookingStatus.confirmed
+                if confirm_immediately
+                else BookingStatus.pending
+            ),
             hourly_price_cents_snapshot=decision.hourly_price_cents,
             total_price_cents=(
                 math.ceil(duration_hours) * decision.hourly_price_cents
             ),
             currency=parking_space.currency,
-            access_code=f"{secrets.randbelow(1_000_000):06d}",
-            parking_pass_token=secrets.token_urlsafe(32),
+            access_code=(
+                f"{secrets.randbelow(1_000_000):06d}" if confirm_immediately else ""
+            ),
+            parking_pass_token=(secrets.token_urlsafe(32) if confirm_immediately else ""),
             idempotency_key=data.idempotency_key,
-            confirmed_at=now,
+            confirmed_at=now if confirm_immediately else None,
         )
         db.add(booking)
         await db.flush()
         db.add(
             BookingEvent(
                 booking_id=booking.id,
-                event_type="confirmed",
+                event_type="confirmed" if confirm_immediately else "payment_pending",
                 event_metadata={
-                    "payment": "beta_no_payment",
+                    "payment": "beta_no_payment" if confirm_immediately else "required",
                     "schedule_price_cents": decision.hourly_price_cents,
                 },
             )
         )
         await db.commit()
+        return booking
+
+    @staticmethod
+    async def confirm_paid(
+        db: AsyncSession,
+        booking: Booking,
+        *,
+        payment_reference: str,
+    ) -> Booking:
+        if booking.status == BookingStatus.confirmed:
+            return booking
+        if booking.status != BookingStatus.pending:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "booking_not_pending",
+                    "message": "Diese Reservierung kann nicht mehr bestätigt werden.",
+                },
+            )
+
+        booking.status = BookingStatus.confirmed
+        booking.confirmed_at = datetime.now(timezone.utc)
+        booking.access_code = f"{secrets.randbelow(1_000_000):06d}"
+        booking.parking_pass_token = secrets.token_urlsafe(32)
+        db.add(
+            BookingEvent(
+                booking_id=booking.id,
+                event_type="payment_confirmed",
+                event_metadata={"payment_reference": payment_reference},
+            )
+        )
+        await db.commit()
+        await db.refresh(booking)
+        return booking
+
+    @staticmethod
+    async def expire_pending(
+        db: AsyncSession,
+        booking: Booking,
+        *,
+        reason: str,
+    ) -> Booking:
+        if booking.status != BookingStatus.pending:
+            return booking
+        booking.status = BookingStatus.expired
+        booking.access_code = ""
+        booking.parking_pass_token = ""
+        db.add(
+            BookingEvent(
+                booking_id=booking.id,
+                event_type="payment_expired",
+                event_metadata={"reason": reason},
+            )
+        )
+        await db.commit()
+        await db.refresh(booking)
         return booking
