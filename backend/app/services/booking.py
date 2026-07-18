@@ -8,15 +8,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
-    AvailabilityBlock,
-    Booking,
-    BookingEvent,
-    BookingStatus,
-    ParkingSpace,
-    Vehicle,
-)
+from app.models import Booking, BookingEvent, BookingStatus, ParkingSpace, Vehicle
 from app.schemas.api import BookingIn
+from app.services.availability import evaluate_availability
 
 FRANKFURT_TIMEZONE = ZoneInfo("Europe/Berlin")
 
@@ -134,30 +128,18 @@ class BookingService:
                 },
             )
 
-        overlapping_booking = await db.scalar(
-            select(Booking.id).where(
-                Booking.parking_space_id == parking_space.id,
-                Booking.status.in_([BookingStatus.pending, BookingStatus.confirmed]),
-                Booking.start_at < end_at,
-                Booking.end_at > start_at,
-            )
+        decision = await evaluate_availability(
+            db,
+            parking_space,
+            start_at,
+            end_at,
         )
-        availability_block = await db.scalar(
-            select(AvailabilityBlock.id).where(
-                AvailabilityBlock.parking_space_id == parking_space.id,
-                AvailabilityBlock.start_at < end_at,
-                AvailabilityBlock.end_at > start_at,
-            )
-        )
-        if overlapping_booking is not None or availability_block is not None:
+        if not decision.available:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
-                    "code": "booking_conflict",
-                    "message": (
-                        "Dieser Zeitraum wurde gerade gebucht. "
-                        "Bitte wähle eine andere Zeit."
-                    ),
+                    "code": decision.code or "booking_conflict",
+                    "message": decision.message or "Der Zeitraum ist nicht verfügbar.",
                 },
             )
 
@@ -169,9 +151,9 @@ class BookingService:
             start_at=start_at,
             end_at=end_at,
             status=BookingStatus.confirmed,
-            hourly_price_cents_snapshot=parking_space.hourly_price_cents,
+            hourly_price_cents_snapshot=decision.hourly_price_cents,
             total_price_cents=(
-                math.ceil(duration_hours) * parking_space.hourly_price_cents
+                math.ceil(duration_hours) * decision.hourly_price_cents
             ),
             currency=parking_space.currency,
             access_code=f"{secrets.randbelow(1_000_000):06d}",
@@ -185,7 +167,10 @@ class BookingService:
             BookingEvent(
                 booking_id=booking.id,
                 event_type="confirmed",
-                event_metadata={"payment": "beta_no_payment"},
+                event_metadata={
+                    "payment": "beta_no_payment",
+                    "schedule_price_cents": decision.hourly_price_cents,
+                },
             )
         )
         await db.commit()
