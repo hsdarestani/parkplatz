@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     stripe_country: str = "DE"
 
     admin_emails: str = ""
-    trust_support_email: str = "support@freiraum.app"
+    trust_support_email: str = "info@aplus-solution.de"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
