@@ -199,13 +199,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onTap: () => context.go('/host'),
               ),
               _ActionTile(
-                icon: Icons.shield_outlined,
-                title: 'Datenschutz',
-                subtitle: 'Genaue Adressen bleiben bis zur Buchung geschützt',
-                onTap: () => _info(
-                  'Datenschutz',
-                  'Die genaue Stellplatzadresse und Zufahrt werden nur nach einer bestätigten Buchung freigegeben.',
-                ),
+                icon: Icons.verified_user_outlined,
+                title: 'Vertrauen & Kontohilfe',
+                subtitle: 'Prüfungen und Anfragen verwalten',
+                onTap: () => context.go('/trust'),
+              ),
+              _ActionTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Datenschutz & Rechtliches',
+                subtitle: 'Datenschutz, Bedingungen und Impressum öffnen',
+                onTap: () => context.go('/legal/privacy'),
               ),
             ],
           ),
@@ -253,20 +256,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     }
   }
-
-  Future<void> _info(String title, String text) => showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(title),
-          content: Text(text),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Verstanden'),
-            ),
-          ],
-        ),
-      );
 }
 
 class _Snapshot {
