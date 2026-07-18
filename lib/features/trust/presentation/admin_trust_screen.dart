@@ -14,17 +14,22 @@ class AdminTrustScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
-  late Future<AdminTrustQueue> future = _load();
+  late Future<_AdminSnapshot> future = _load();
 
-  Future<AdminTrustQueue> _load() =>
-      ref.read(trustRepositoryProvider).adminQueue();
+  Future<_AdminSnapshot> _load() async {
+    final repository = ref.read(trustRepositoryProvider);
+    return _AdminSnapshot(
+      await repository.adminQueue(),
+      await repository.auditLog(),
+    );
+  }
 
   void reload() => setState(() => future = _load());
 
   @override
   Widget build(BuildContext context) => FreiraumScaffold(
         title: 'Moderation',
-        subtitle: 'Offene Prüfungen und Anfragen bearbeiten.',
+        subtitle: 'Offene Prüfungen, Anfragen und Admin-Aktivitäten.',
         activePath: '/trust',
         actions: [
           IconButton(
@@ -32,7 +37,7 @@ class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
             icon: const Icon(Icons.close),
           ),
         ],
-        child: FutureBuilder<AdminTrustQueue>(
+        child: FutureBuilder<_AdminSnapshot>(
           future: future,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
@@ -52,7 +57,7 @@ class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
         ),
       );
 
-  Widget _content(AdminTrustQueue data) => ListView(
+  Widget _content(_AdminSnapshot data) => ListView(
         padding: const EdgeInsets.all(24),
         children: [
           Center(
@@ -61,27 +66,41 @@ class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _summary(data),
+                  _summary(data.queue, data.audit),
                   const SizedBox(height: 22),
                   Text(
                     'Stellplatzprüfungen',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 10),
-                  if (data.verifications.isEmpty)
+                  if (data.queue.verifications.isEmpty)
                     const _Empty(text: 'Keine offenen Prüfungen.')
                   else
-                    ...data.verifications.map(_verificationCard),
+                    ...data.queue.verifications.map(_verificationCard),
                   const SizedBox(height: 22),
                   Text(
                     'Supportanfragen',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 10),
-                  if (data.reports.isEmpty)
+                  if (data.queue.reports.isEmpty)
                     const _Empty(text: 'Keine offenen Anfragen.')
                   else
-                    ...data.reports.map(_reportCard),
+                    ...data.queue.reports.map(_reportCard),
+                  const SizedBox(height: 22),
+                  Text(
+                    'Audit Log',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 10),
+                  if (data.audit.isEmpty)
+                    const _Empty(text: 'Noch keine Admin-Aktionen protokolliert.')
+                  else
+                    Card(
+                      child: Column(
+                        children: data.audit.take(30).map(_auditTile).toList(),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -89,14 +108,15 @@ class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
         ],
       );
 
-  Widget _summary(AdminTrustQueue data) => Container(
+  Widget _summary(AdminTrustQueue data, List<AdminAuditRecord> audit) => Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [T.ink, T.inkSoft]),
           borderRadius: BorderRadius.circular(T.radiusSpacious),
         ),
         child: Text(
-          '${data.verifications.length} Prüfungen · ${data.reports.length} Anfragen',
+          '${data.verifications.length} Prüfungen · '
+          '${data.reports.length} Anfragen · ${audit.length} protokollierte Aktionen',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -178,6 +198,20 @@ class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
         ),
       );
 
+  Widget _auditTile(AdminAuditRecord item) => ListTile(
+        leading: const Icon(Icons.history_outlined),
+        title: Text(
+          item.action.replaceAll('_', ' '),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text('${item.targetType} · ${item.targetId}'),
+        trailing: Text(
+          '${item.createdAt.day.toString().padLeft(2, '0')}.'
+          '${item.createdAt.month.toString().padLeft(2, '0')}.'
+          '${item.createdAt.year}',
+        ),
+      );
+
   Future<String> _note(String title) async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
@@ -228,6 +262,13 @@ class _AdminTrustScreenState extends ConsumerState<AdminTrustScreen> {
         );
     reload();
   }
+}
+
+class _AdminSnapshot {
+  const _AdminSnapshot(this.queue, this.audit);
+
+  final AdminTrustQueue queue;
+  final List<AdminAuditRecord> audit;
 }
 
 class _Empty extends StatelessWidget {
