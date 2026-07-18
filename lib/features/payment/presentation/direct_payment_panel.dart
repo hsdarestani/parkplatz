@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,11 +14,14 @@ class DirectPaymentPanel extends StatefulWidget {
     required this.value,
     required this.busy,
     required this.onSubmit,
+    required this.onUploadReceipt,
   });
 
   final DirectPaymentInstructions value;
   final bool busy;
   final Future<void> Function(String reference) onSubmit;
+  final Future<ReceiptUpload> Function(Uint8List bytes, String filename)
+      onUploadReceipt;
 
   @override
   State<DirectPaymentPanel> createState() => _DirectPaymentPanelState();
@@ -23,6 +29,8 @@ class DirectPaymentPanel extends StatefulWidget {
 
 class _DirectPaymentPanelState extends State<DirectPaymentPanel> {
   final controller = TextEditingController();
+  bool uploading = false;
+  ReceiptUpload? receipt;
 
   @override
   void dispose() {
@@ -63,10 +71,7 @@ class _DirectPaymentPanelState extends State<DirectPaymentPanel> {
             ],
           ),
           const SizedBox(height: 12),
-          _CopyLine(
-            label: 'Betrag',
-            value: _money(value.amountCents),
-          ),
+          _CopyLine(label: 'Betrag', value: _money(value.amountCents)),
           _CopyLine(
             label: 'Verwendungszweck',
             value: value.paymentReference,
@@ -99,8 +104,47 @@ class _DirectPaymentPanelState extends State<DirectPaymentPanel> {
             ),
           ),
           const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: receipt == null ? T.line : T.mint),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  receipt == null
+                      ? Icons.upload_file_outlined
+                      : Icons.check_circle_outline,
+                  color: receipt == null ? T.muted : T.success,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    receipt == null
+                        ? 'Optional: Zahlungsbeleg als JPG, PNG, WEBP oder PDF hochladen.'
+                        : '${receipt!.originalName} wurde hochgeladen.',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: widget.busy || uploading ? null : _pickReceipt,
+                  icon: uploading
+                      ? const SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.attach_file),
+                  label: Text(receipt == null ? 'Beleg wählen' : 'Ersetzen'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: widget.busy
+            onPressed: widget.busy || uploading
                 ? null
                 : () {
                     final reference = controller.text.trim();
@@ -135,6 +179,37 @@ class _DirectPaymentPanelState extends State<DirectPaymentPanel> {
         ],
       ),
     );
+  }
+
+  Future<void> _pickReceipt() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+      withData: true,
+      allowMultiple: false,
+    );
+    final file = result?.files.single;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null || !mounted) return;
+    if (file.size > 5 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Der Beleg darf höchstens 5 MB groß sein.')),
+      );
+      return;
+    }
+    setState(() => uploading = true);
+    try {
+      final uploaded = await widget.onUploadReceipt(bytes, file.name);
+      if (mounted) setState(() => receipt = uploaded);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
   }
 
   Future<void> _openPayment() async {
