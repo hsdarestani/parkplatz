@@ -25,6 +25,24 @@ ENVIRONMENT=production
 ENV
 fi
 
+ensure_env() {
+  local key="$1"
+  local value="$2"
+  if ! grep --quiet "^${key}=" .env.production; then
+    printf '%s=%s\n' "$key" "$value" >> .env.production
+  fi
+}
+
+# Payments remain in safe beta mode until real Stripe secrets are added to the
+# server and PAYMENT_MODE is deliberately changed to stripe.
+ensure_env PAYMENT_MODE beta
+ensure_env PUBLIC_APP_URL https://parkplatz.smarbiz.sbs
+ensure_env PLATFORM_FEE_BASIS_POINTS 1500
+ensure_env PAYMENT_HOLD_MINUTES 30
+ensure_env STRIPE_COUNTRY DE
+ensure_env STRIPE_SECRET_KEY ""
+ensure_env STRIPE_WEBHOOK_SECRET ""
+
 chmod 600 .env.production
 
 docker compose -f "$COMPOSE_FILE" up -d db
