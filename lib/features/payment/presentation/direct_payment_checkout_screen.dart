@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -267,7 +268,10 @@ class _DirectPaymentCheckoutScreenState
             Text(space.title, style: Theme.of(context).textTheme.headlineSmall),
             Text(space.approximate(), style: const TextStyle(color: T.muted)),
             const SizedBox(height: 20),
-            _line('Datum', legacy.selectedStart.toLocal().toString().split(' ').first),
+            _line(
+              'Datum',
+              legacy.selectedStart.toLocal().toString().split(' ').first,
+            ),
             _line(
               'Zeitraum',
               '${legacy.selectedStart.hour.toString().padLeft(2, '0')}:${legacy.selectedStart.minute.toString().padLeft(2, '0')} – ${legacy.selectedEnd.hour.toString().padLeft(2, '0')}:${legacy.selectedEnd.minute.toString().padLeft(2, '0')} Uhr',
@@ -284,7 +288,10 @@ class _DirectPaymentCheckoutScreenState
                 ),
                 Text(
                   _money(estimateCents),
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),
@@ -303,6 +310,7 @@ class _DirectPaymentCheckoutScreenState
                 value: checkout!.directPayment!,
                 busy: submitting,
                 onSubmit: _submitReference,
+                onUploadReceipt: _uploadReceipt,
               )
             else ...[
               const SizedBox(height: 18),
@@ -418,6 +426,19 @@ class _DirectPaymentCheckoutScreenState
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  Future<ReceiptUpload> _uploadReceipt(
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final result = checkout;
+    if (result == null) {
+      throw StateError('Buchungsanfrage fehlt.');
+    }
+    return ref
+        .read(paymentRepositoryProvider)
+        .uploadReceipt(result.bookingId, bytes, filename);
   }
 
   Future<void> _submitReference(String reference) async {
