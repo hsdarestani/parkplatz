@@ -48,6 +48,16 @@ ensure_env STRIPE_WEBHOOK_SECRET ""
 ensure_env ADMIN_EMAILS ""
 ensure_env TRUST_SUPPORT_EMAIL info@aplus-solution.de
 
+# Email delivery stays in outbox mode until an SMTP server is configured.
+ensure_env EMAIL_MODE outbox
+ensure_env SMTP_HOST ""
+ensure_env SMTP_PORT 587
+ensure_env SMTP_FROM_EMAIL info@aplus-solution.de
+ensure_env SMTP_FROM_NAME FREIRAUM
+ensure_env SMTP_STARTTLS true
+ensure_env NOTIFICATION_POLL_SECONDS 15
+ensure_env PASSWORD_RESET_MINUTES 30
+
 # Replace the earlier placeholder support address on existing installations.
 sed -i 's/^TRUST_SUPPORT_EMAIL=support@freiraum\.app$/TRUST_SUPPORT_EMAIL=info@aplus-solution.de/' .env.production
 
