@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/widgets/freiraum_scaffold.dart';
-import '../../booking/data/repositories.dart';
 import '../../host/data/host_repository.dart';
+import '../../parking/data/providers.dart';
 import '../data/trust_repository.dart';
 
 class SupportRequestScreen extends ConsumerStatefulWidget {
@@ -53,7 +53,7 @@ class _SupportRequestScreenState extends ConsumerState<SupportRequestScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: target,
+                          initialValue: target,
                           decoration: const InputDecoration(labelText: 'Bezug'),
                           items: targets
                               .map(
@@ -69,7 +69,7 @@ class _SupportRequestScreenState extends ConsumerState<SupportRequestScreen> {
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
-                          value: category,
+                          initialValue: category,
                           decoration: const InputDecoration(labelText: 'Kategorie'),
                           items: const [
                             DropdownMenuItem(
