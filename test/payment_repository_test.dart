@@ -65,6 +65,46 @@ void main() {
     expect(result.sessionId, 'cs_test_1');
   });
 
+  test('direct checkout includes owner destination and booking reference', () {
+    final result = PaymentCheckoutResult.fromJson({
+      'requires_redirect': false,
+      'booking_id': 'booking-direct',
+      'payment': {'status': 'awaiting_payment'},
+      'direct_payment': {
+        'method': 'paypal',
+        'payment_url': 'https://paypal.me/example',
+        'payment_reference': 'FR-ABC123',
+        'amount_cents': 900,
+        'currency': 'EUR',
+      },
+    });
+
+    expect(result.requiresRedirect, isFalse);
+    expect(result.status, 'awaiting_payment');
+    expect(result.directPayment?.method, 'paypal');
+    expect(result.directPayment?.paymentReference, 'FR-ABC123');
+    expect(result.directPayment?.amountCents, 900);
+  });
+
+  test('direct settings serialize only normalized payment fields', () {
+    const settings = DirectPaymentSettings(
+      method: 'sepa',
+      enabled: true,
+      configured: true,
+      iban: 'DE12 3456 7890 1234 5678 90',
+      accountHolder: '  Max Mustermann  ',
+      instructions: '  Use the booking reference.  ',
+    );
+
+    final json = settings.toJson();
+
+    expect(json['method'], 'sepa');
+    expect(json['iban'], 'DE12345678901234567890');
+    expect(json['account_holder'], 'Max Mustermann');
+    expect(json['instructions'], 'Use the booking reference.');
+    expect(json['enabled'], isTrue);
+  });
+
   test('connect status is ready only when charges and payouts are enabled', () {
     final ready = ConnectStatus.fromJson({
       'mode': 'stripe',
