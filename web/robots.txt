@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://parkplatz.smarbiz.sbs/sitemap.xml
