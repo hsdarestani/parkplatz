@@ -7,7 +7,7 @@ import '../features/account/presentation/password_recovery_screens.dart';
 import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
 import '../features/booking/presentation/booking_screens.dart';
-import '../features/booking/presentation/my_bookings_screen.dart';
+import '../features/booking/presentation/direct_my_bookings_screen.dart';
 import '../features/booking/presentation/premium_confirmation_pass.dart';
 import '../features/booking/presentation/premium_parking_detail.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
@@ -100,7 +100,7 @@ GoRouter createRouter() => GoRouter(
         GoRoute(
           path: '/bookings',
           builder: (context, state) =>
-              _protected('/bookings', const MyBookingsScreen()),
+              _protected('/bookings', const DirectMyBookingsScreen()),
         ),
         GoRoute(
           path: '/bookings/:id/pass',
