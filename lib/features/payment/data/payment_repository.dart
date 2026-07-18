@@ -1,8 +1,41 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../parking/data/providers.dart';
 import '../../booking/data/repositories.dart';
+
+class DirectPaymentInstructions {
+  const DirectPaymentInstructions({
+    required this.method,
+    required this.paymentReference,
+    required this.amountCents,
+    required this.currency,
+    this.paymentUrl,
+    this.iban,
+    this.accountHolder,
+    this.instructions,
+  });
+
+  final String method;
+  final String paymentReference;
+  final int amountCents;
+  final String currency;
+  final String? paymentUrl;
+  final String? iban;
+  final String? accountHolder;
+  final String? instructions;
+
+  factory DirectPaymentInstructions.fromJson(Map<String, dynamic> json) =>
+      DirectPaymentInstructions(
+        method: json['method']?.toString() ?? 'paypal',
+        paymentReference: json['payment_reference']?.toString() ?? '',
+        amountCents: json['amount_cents'] as int,
+        currency: json['currency']?.toString() ?? 'EUR',
+        paymentUrl: json['payment_url']?.toString(),
+        iban: json['iban']?.toString(),
+        accountHolder: json['account_holder']?.toString(),
+        instructions: json['instructions']?.toString(),
+      );
+}
 
 class PaymentCheckoutResult {
   const PaymentCheckoutResult({
@@ -11,6 +44,7 @@ class PaymentCheckoutResult {
     required this.status,
     this.checkoutUrl,
     this.sessionId,
+    this.directPayment,
   });
 
   final String bookingId;
@@ -18,17 +52,120 @@ class PaymentCheckoutResult {
   final String status;
   final String? checkoutUrl;
   final String? sessionId;
+  final DirectPaymentInstructions? directPayment;
 
   factory PaymentCheckoutResult.fromJson(Map<String, dynamic> json) {
     final payment = json['payment'] as Map<String, dynamic>;
+    final direct = json['direct_payment'];
     return PaymentCheckoutResult(
       bookingId: json['booking_id'].toString(),
       requiresRedirect: json['requires_redirect'] == true,
       status: payment['status']?.toString() ?? 'pending',
       checkoutUrl: payment['checkout_url']?.toString(),
       sessionId: payment['checkout_session_id']?.toString(),
+      directPayment: direct is Map<String, dynamic>
+          ? DirectPaymentInstructions.fromJson(direct)
+          : null,
     );
   }
+}
+
+class DirectPaymentSettings {
+  const DirectPaymentSettings({
+    required this.method,
+    required this.enabled,
+    required this.configured,
+    this.paymentUrl,
+    this.iban,
+    this.accountHolder,
+    this.instructions,
+  });
+
+  final String method;
+  final bool enabled;
+  final bool configured;
+  final String? paymentUrl;
+  final String? iban;
+  final String? accountHolder;
+  final String? instructions;
+
+  factory DirectPaymentSettings.fromJson(Map<String, dynamic> json) =>
+      DirectPaymentSettings(
+        method: json['method']?.toString() ?? 'paypal',
+        enabled: json['enabled'] == true,
+        configured: json['configured'] == true,
+        paymentUrl: json['payment_url']?.toString(),
+        iban: json['iban']?.toString(),
+        accountHolder: json['account_holder']?.toString(),
+        instructions: json['instructions']?.toString(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'method': method,
+        'payment_url': paymentUrl?.trim().isEmpty == true ? null : paymentUrl?.trim(),
+        'iban': iban?.replaceAll(' ', '').trim().isEmpty == true
+            ? null
+            : iban?.replaceAll(' ', '').trim(),
+        'account_holder': accountHolder?.trim().isEmpty == true
+            ? null
+            : accountHolder?.trim(),
+        'instructions': instructions?.trim().isEmpty == true
+            ? null
+            : instructions?.trim(),
+        'enabled': enabled,
+      };
+}
+
+class PendingDirectPayment {
+  const PendingDirectPayment({
+    required this.paymentId,
+    required this.bookingId,
+    required this.bookingReference,
+    required this.parkingTitle,
+    required this.renterName,
+    required this.renterEmail,
+    required this.vehiclePlate,
+    required this.start,
+    required this.end,
+    required this.amountCents,
+    required this.currency,
+    required this.paymentMethod,
+    required this.payerReference,
+    required this.submittedAt,
+  });
+
+  final String paymentId;
+  final String bookingId;
+  final String bookingReference;
+  final String parkingTitle;
+  final String renterName;
+  final String renterEmail;
+  final String vehiclePlate;
+  final DateTime start;
+  final DateTime end;
+  final int amountCents;
+  final String currency;
+  final String paymentMethod;
+  final String payerReference;
+  final DateTime submittedAt;
+
+  factory PendingDirectPayment.fromJson(Map<String, dynamic> json) =>
+      PendingDirectPayment(
+        paymentId: json['payment_id'].toString(),
+        bookingId: json['booking_id'].toString(),
+        bookingReference: json['booking_reference'].toString(),
+        parkingTitle: json['parking_title'].toString(),
+        renterName: json['renter_name'].toString(),
+        renterEmail: json['renter_email'].toString(),
+        vehiclePlate: json['vehicle_plate'].toString(),
+        start: DateTime.parse(json['start_at'].toString()),
+        end: DateTime.parse(json['end_at'].toString()),
+        amountCents: json['amount_cents'] as int,
+        currency: json['currency']?.toString() ?? 'EUR',
+        paymentMethod: json['payment_method']?.toString() ?? 'direct',
+        payerReference: json['payer_reference']?.toString() ?? '',
+        submittedAt: DateTime.parse(json['submitted_at'].toString()),
+      );
 }
 
 class ConnectStatus {
@@ -143,6 +280,17 @@ class HostFinanceSnapshot {
 abstract interface class PaymentRepository {
   Future<PaymentCheckoutResult> createCheckout(BookingRecord booking);
   Future<PaymentCheckoutResult> checkoutStatus(String sessionId);
+  Future<void> submitDirectReference(String bookingId, String reference);
+  Future<DirectPaymentSettings> directSettings();
+  Future<DirectPaymentSettings> saveDirectSettings(
+    DirectPaymentSettings settings,
+  );
+  Future<List<PendingDirectPayment>> pendingDirectPayments();
+  Future<void> decideDirectPayment(
+    String paymentId,
+    String decision, {
+    String? reason,
+  });
   Future<HostFinanceSnapshot> finance();
   Future<ConnectStatus> connectStatus();
   Future<Uri> onboardingLink();
@@ -180,6 +328,57 @@ class ApiPaymentRepository implements PaymentRepository {
       status: payment['status']?.toString() ?? 'pending',
       checkoutUrl: payment['checkout_url']?.toString(),
       sessionId: payment['checkout_session_id']?.toString(),
+    );
+  }
+
+  @override
+  Future<void> submitDirectReference(String bookingId, String reference) async {
+    await api.post(
+      '/payments/bookings/$bookingId/reference',
+      body: {'reference': reference.trim()},
+    );
+  }
+
+  @override
+  Future<DirectPaymentSettings> directSettings() async =>
+      DirectPaymentSettings.fromJson(
+        await api.get('/host/payments/direct/settings')
+            as Map<String, dynamic>,
+      );
+
+  @override
+  Future<DirectPaymentSettings> saveDirectSettings(
+    DirectPaymentSettings settings,
+  ) async =>
+      DirectPaymentSettings.fromJson(
+        await api.post(
+          '/host/payments/direct/settings',
+          body: settings.toJson(),
+        ) as Map<String, dynamic>,
+      );
+
+  @override
+  Future<List<PendingDirectPayment>> pendingDirectPayments() async =>
+      (await api.get('/host/payments/direct/pending') as List)
+          .map(
+            (value) => PendingDirectPayment.fromJson(
+              value as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+
+  @override
+  Future<void> decideDirectPayment(
+    String paymentId,
+    String decision, {
+    String? reason,
+  }) async {
+    await api.post(
+      '/host/payments/direct/$paymentId/decision',
+      body: {
+        'decision': decision,
+        'reason': reason?.trim().isEmpty == true ? null : reason?.trim(),
+      },
     );
   }
 
