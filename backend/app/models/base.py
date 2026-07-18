@@ -122,6 +122,7 @@ class AvailabilityRule(Base):
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
     active: Mapped[bool] = mapped_column(default=True)
+    price_override_cents: Mapped[int | None] = mapped_column(nullable=True)
 
 
 class AvailabilityBlock(Base):
