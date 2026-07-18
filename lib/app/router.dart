@@ -5,7 +5,6 @@ import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
 import '../features/booking/presentation/booking_screens.dart';
 import '../features/booking/presentation/my_bookings_screen.dart';
-import '../features/booking/presentation/premium_checkout.dart';
 import '../features/booking/presentation/premium_confirmation_pass.dart';
 import '../features/booking/presentation/premium_parking_detail.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
@@ -13,6 +12,9 @@ import '../features/host/presentation/host_listing_wizard.dart';
 import '../features/host/presentation/host_manage_screen.dart';
 import '../features/host/presentation/host_operations_dashboard.dart';
 import '../features/launch/launch_screen.dart';
+import '../features/payment/presentation/host_finance_screen.dart';
+import '../features/payment/presentation/payment_checkout_screen.dart';
+import '../features/payment/presentation/payment_return_screen.dart';
 import '../shared/widgets/authenticated_route_guard.dart';
 
 AuthenticatedRouteGuard _protected(String path, Widget child) =>
@@ -54,9 +56,19 @@ GoRouter createRouter() => GoRouter(
             final path = '/checkout/${state.pathParameters['id']}';
             return _protected(
               path,
-              PremiumCheckoutScreen(id: state.pathParameters['id']!),
+              PaymentCheckoutScreen(id: state.pathParameters['id']!),
             );
           },
+        ),
+        GoRoute(
+          path: '/payment-return',
+          builder: (context, state) => _protected(
+            '/payment-return',
+            PaymentReturnScreen(
+              sessionId: state.uri.queryParameters['session_id'] ?? '',
+              bookingId: state.uri.queryParameters['booking_id'],
+            ),
+          ),
         ),
         GoRoute(
           path: '/booking/:id/confirmed',
@@ -102,6 +114,11 @@ GoRouter createRouter() => GoRouter(
           path: '/host/new',
           builder: (context, state) =>
               _protected('/host/new', const HostListingWizardScreen()),
+        ),
+        GoRoute(
+          path: '/host/finance',
+          builder: (context, state) =>
+              _protected('/host/finance', const HostFinanceScreen()),
         ),
         GoRoute(
           path: '/host/:id/manage',
