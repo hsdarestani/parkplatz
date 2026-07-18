@@ -3,6 +3,7 @@
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.engine.reflection import Inspector
 
 revision = "0003"
 down_revision = "0002"
@@ -10,7 +11,7 @@ branch_labels = None
 depends_on = None
 
 
-def _inspector() -> sa.Inspector:
+def _inspector() -> Inspector:
     return sa.inspect(op.get_bind())
 
 
