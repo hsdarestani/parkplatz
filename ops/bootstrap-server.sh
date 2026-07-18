@@ -3,6 +3,7 @@ set -euo pipefail
 
 COMPOSE_FILE="docker-compose.prod.yml"
 HEALTH_URL="http://127.0.0.1:8000/api/health"
+SPACES_URL="http://127.0.0.1:8000/api/parking-spaces"
 
 command -v docker >/dev/null
 docker compose version >/dev/null
@@ -39,9 +40,39 @@ if [[ -z "$api_container_id" ]]; then
 fi
 
 for attempt in $(seq 1 30); do
+  health_ok=false
+  spaces_ok=false
+
   if curl --fail --silent --show-error --max-time 5 "$HEALTH_URL" > /tmp/freiraum-health.json 2>/tmp/freiraum-health.err; then
+    if python - <<'PY'
+import json
+from pathlib import Path
+
+payload = json.loads(Path('/tmp/freiraum-health.json').read_text())
+raise SystemExit(0 if payload.get('status') == 'ok' and payload.get('database') == 'connected' else 1)
+PY
+    then
+      health_ok=true
+    fi
+  fi
+
+  if [[ "$health_ok" == true ]] && curl --fail --silent --show-error --max-time 5 "$SPACES_URL" > /tmp/freiraum-spaces.json 2>/tmp/freiraum-spaces.err; then
+    if python - <<'PY'
+import json
+from pathlib import Path
+
+payload = json.loads(Path('/tmp/freiraum-spaces.json').read_text())
+raise SystemExit(0 if isinstance(payload, list) else 1)
+PY
+    then
+      spaces_ok=true
+    fi
+  fi
+
+  if [[ "$health_ok" == true && "$spaces_ok" == true ]]; then
     cat /tmp/freiraum-health.json
     echo
+    echo "Production parking-space query succeeded."
     echo "FREIRAUM API is ready."
     exit 0
   fi
@@ -56,12 +87,13 @@ for attempt in $(seq 1 30); do
     exit 1
   fi
 
-  echo "Waiting for FREIRAUM API readiness ($attempt/30, health=$health_status)..."
+  echo "Waiting for FREIRAUM API data readiness ($attempt/30, health=$health_status)..."
   sleep 2
 done
 
-echo "API did not become ready before the deployment timeout." >&2
+echo "API data routes did not become ready before the deployment timeout." >&2
 cat /tmp/freiraum-health.err >&2 || true
+cat /tmp/freiraum-spaces.err >&2 || true
 docker compose -f "$COMPOSE_FILE" ps >&2
 docker compose -f "$COMPOSE_FILE" logs --no-color --tail=200 api >&2
 exit 1
