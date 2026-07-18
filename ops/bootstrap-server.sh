@@ -43,6 +43,11 @@ ensure_env STRIPE_COUNTRY DE
 ensure_env STRIPE_SECRET_KEY ""
 ensure_env STRIPE_WEBHOOK_SECRET ""
 
+# Trust moderation is locked unless one or more comma-separated admin emails
+# are deliberately configured on the server.
+ensure_env ADMIN_EMAILS ""
+ensure_env TRUST_SUPPORT_EMAIL support@freiraum.app
+
 # Stripe requires Checkout expiration to be at least 30 minutes in the future.
 # Upgrade the earlier default so network latency cannot make the request invalid.
 sed -i 's/^PAYMENT_HOLD_MINUTES=30$/PAYMENT_HOLD_MINUTES=31/' .env.production
