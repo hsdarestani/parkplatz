@@ -1,11 +1,11 @@
 import re
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
@@ -13,6 +13,8 @@ from app.core.config import settings
 from app.core.security import token_hash
 from app.db.session import get_session
 from app.models import (
+    AvailabilityBlock,
+    AvailabilityRule,
     Booking,
     BookingEvent,
     BookingStatus,
@@ -24,6 +26,8 @@ from app.models import (
 from app.schemas.api import (
     BookingIn,
     CancelIn,
+    HostAvailabilityBlockIn,
+    HostAvailabilityScheduleIn,
     HostParkingSpaceIn,
     HostParkingStatusIn,
     Login,
@@ -34,6 +38,7 @@ from app.schemas.api import (
     VehicleOut,
 )
 from app.services.auth import AuthService
+from app.services.availability import evaluate_availability
 from app.services.booking import BookingService, normalize_booking_time
 
 router = APIRouter(prefix="/api")
@@ -80,6 +85,26 @@ def host_space(parking_space: ParkingSpace) -> dict[str, Any]:
     return result
 
 
+def availability_rule_out(rule: AvailabilityRule) -> dict[str, Any]:
+    return {
+        "id": rule.id,
+        "weekday": rule.weekday,
+        "active": rule.active,
+        "start_time": rule.start_time,
+        "end_time": rule.end_time,
+        "price_override_cents": rule.price_override_cents,
+    }
+
+
+def availability_block_out(block: AvailabilityBlock) -> dict[str, Any]:
+    return {
+        "id": block.id,
+        "start_at": block.start_at,
+        "end_at": block.end_at,
+        "reason": block.reason,
+    }
+
+
 def booking_out(
     booking: Booking,
     parking_space: ParkingSpace | None = None,
@@ -111,6 +136,23 @@ def booking_out(
             parking_pass_token=booking.parking_pass_token,
         )
     return result
+
+
+async def owned_space(
+    db: AsyncSession,
+    space_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> ParkingSpace:
+    parking_space = await db.scalar(
+        select(ParkingSpace).where(
+            ParkingSpace.id == space_id,
+            ParkingSpace.owner_id == user_id,
+            ParkingSpace.status != "archived",
+        )
+    )
+    if parking_space is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return parking_space
 
 
 @router.get("/health")
@@ -251,18 +293,32 @@ async def availability(
     end_at: datetime,
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    parking_space = await db.get(ParkingSpace, space_id)
+    if parking_space is None or parking_space.status != "active":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
     normalized_start = normalize_booking_time(start_at)
     normalized_end = normalize_booking_time(end_at)
-    overlap = await db.scalar(
-        select(Booking.id).where(
-            Booking.parking_space_id == space_id,
-            Booking.status.in_([BookingStatus.pending, BookingStatus.confirmed]),
-            Booking.start_at < normalized_end,
-            Booking.end_at > normalized_start,
+    if normalized_end <= normalized_start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "invalid_time",
+                "message": "Bitte wähle einen gültigen Zeitraum.",
+            },
         )
+
+    decision = await evaluate_availability(
+        db,
+        parking_space,
+        normalized_start,
+        normalized_end,
     )
     return {
-        "available": overlap is None,
+        "available": decision.available,
+        "code": decision.code,
+        "message": decision.message,
+        "hourly_price_cents": decision.hourly_price_cents,
         "start_at": normalized_start,
         "end_at": normalized_end,
     }
@@ -275,7 +331,10 @@ async def host_spaces(
 ) -> list[dict[str, Any]]:
     result = await db.scalars(
         select(ParkingSpace)
-        .where(ParkingSpace.owner_id == user_id)
+        .where(
+            ParkingSpace.owner_id == user_id,
+            ParkingSpace.status != "archived",
+        )
         .order_by(ParkingSpace.created_at.desc())
     )
     return [host_space(parking_space) for parking_space in result.all()]
@@ -302,6 +361,35 @@ async def add_host_space(
         **payload,
     )
     db.add(parking_space)
+    await db.flush()
+    for weekday in range(7):
+        db.add(
+            AvailabilityRule(
+                parking_space_id=parking_space.id,
+                weekday=weekday,
+                start_time=time(0, 0),
+                end_time=time(23, 59),
+                active=True,
+                price_override_cents=None,
+            )
+        )
+    await db.commit()
+    await db.refresh(parking_space)
+    return host_space(parking_space)
+
+
+@router.patch("/host/parking-spaces/{space_id}")
+async def update_host_space(
+    space_id: uuid.UUID,
+    data: HostParkingSpaceIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    parking_space = await owned_space(db, space_id, user_id)
+    payload = data.model_dump()
+    payload["currency"] = data.currency.upper()
+    for key, value in payload.items():
+        setattr(parking_space, key, value)
     await db.commit()
     await db.refresh(parking_space)
     return host_space(parking_space)
@@ -314,18 +402,165 @@ async def set_host_space_status(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    parking_space = await db.scalar(
-        select(ParkingSpace).where(
-            ParkingSpace.id == space_id,
-            ParkingSpace.owner_id == user_id,
-        )
-    )
-    if parking_space is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    parking_space = await owned_space(db, space_id, user_id)
     parking_space.status = data.status
     await db.commit()
     await db.refresh(parking_space)
     return host_space(parking_space)
+
+
+@router.delete(
+    "/host/parking-spaces/{space_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def archive_host_space(
+    space_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    parking_space = await owned_space(db, space_id, user_id)
+    active_booking = await db.scalar(
+        select(Booking.id).where(
+            Booking.parking_space_id == parking_space.id,
+            Booking.status.in_([BookingStatus.pending, BookingStatus.confirmed]),
+            Booking.end_at > datetime.now(timezone.utc),
+        )
+    )
+    if active_booking is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "active_bookings",
+                "message": (
+                    "Der Stellplatz kann erst nach allen aktiven Buchungen "
+                    "gelöscht werden."
+                ),
+            },
+        )
+    parking_space.status = "archived"
+    await db.commit()
+
+
+@router.get("/host/parking-spaces/{space_id}/availability")
+async def host_availability(
+    space_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    parking_space = await owned_space(db, space_id, user_id)
+    rules = list(
+        (
+            await db.scalars(
+                select(AvailabilityRule)
+                .where(AvailabilityRule.parking_space_id == parking_space.id)
+                .order_by(AvailabilityRule.weekday, AvailabilityRule.start_time)
+            )
+        ).all()
+    )
+    blocks = list(
+        (
+            await db.scalars(
+                select(AvailabilityBlock)
+                .where(AvailabilityBlock.parking_space_id == parking_space.id)
+                .order_by(AvailabilityBlock.start_at)
+            )
+        ).all()
+    )
+    if not rules:
+        rules = [
+            AvailabilityRule(
+                parking_space_id=parking_space.id,
+                weekday=weekday,
+                start_time=time(0, 0),
+                end_time=time(23, 59),
+                active=True,
+                price_override_cents=None,
+            )
+            for weekday in range(7)
+        ]
+    return {
+        "rules": [availability_rule_out(rule) for rule in rules],
+        "blocks": [availability_block_out(block) for block in blocks],
+    }
+
+
+@router.put("/host/parking-spaces/{space_id}/availability")
+async def replace_host_availability(
+    space_id: uuid.UUID,
+    data: HostAvailabilityScheduleIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    parking_space = await owned_space(db, space_id, user_id)
+    await db.execute(
+        delete(AvailabilityRule).where(
+            AvailabilityRule.parking_space_id == parking_space.id
+        )
+    )
+    for rule in data.rules:
+        db.add(
+            AvailabilityRule(
+                parking_space_id=parking_space.id,
+                **rule.model_dump(),
+            )
+        )
+    await db.commit()
+    saved_rules = list(
+        (
+            await db.scalars(
+                select(AvailabilityRule)
+                .where(AvailabilityRule.parking_space_id == parking_space.id)
+                .order_by(AvailabilityRule.weekday)
+            )
+        ).all()
+    )
+    return {"rules": [availability_rule_out(rule) for rule in saved_rules]}
+
+
+@router.post(
+    "/host/parking-spaces/{space_id}/availability-blocks",
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_host_availability_block(
+    space_id: uuid.UUID,
+    data: HostAvailabilityBlockIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    parking_space = await owned_space(db, space_id, user_id)
+    block = AvailabilityBlock(
+        parking_space_id=parking_space.id,
+        start_at=normalize_booking_time(data.start_at),
+        end_at=normalize_booking_time(data.end_at),
+        reason=data.reason.strip() if data.reason else None,
+    )
+    db.add(block)
+    await db.commit()
+    await db.refresh(block)
+    return availability_block_out(block)
+
+
+@router.delete(
+    "/host/parking-spaces/{space_id}/availability-blocks/{block_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_host_availability_block(
+    space_id: uuid.UUID,
+    block_id: int,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    parking_space = await owned_space(db, space_id, user_id)
+    block = await db.scalar(
+        select(AvailabilityBlock).where(
+            AvailabilityBlock.id == block_id,
+            AvailabilityBlock.parking_space_id == parking_space.id,
+        )
+    )
+    if block is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await db.delete(block)
+    await db.commit()
 
 
 @router.get("/host/bookings")
