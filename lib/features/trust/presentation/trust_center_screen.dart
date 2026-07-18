@@ -11,8 +11,8 @@ class TrustCenterScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => FreiraumScaffold(
-        title: 'Vertrauen',
-        subtitle: 'Prüfungen, Kontohilfe und rechtliche Informationen.',
+        title: 'Vertrauen & Datenschutz',
+        subtitle: 'Prüfungen, Kontosicherheit und rechtliche Informationen.',
         activePath: '/trust',
         child: FutureBuilder<TrustOverview>(
           future: ref.read(trustRepositoryProvider).overview(),
@@ -88,6 +88,13 @@ class TrustCenterScreen extends ConsumerWidget {
                           title: 'Kontohilfe',
                           subtitle: 'Anfrage zu Buchung oder Stellplatz senden.',
                           onTap: () => context.go('/trust/support'),
+                        ),
+                        _Action(
+                          icon: Icons.security_outlined,
+                          title: 'Sicherheit & Kontodaten',
+                          subtitle:
+                              'E-Mails, Passwort, Datenexport und Kontolöschung.',
+                          onTap: () => context.go('/account/security'),
                         ),
                         _Action(
                           icon: Icons.gavel_outlined,
