@@ -32,6 +32,8 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://freiraum:freiraum@localhost:5432/freiraum
       JWT_SECRET: ci-only-secret-not-used-in-production
+      PAYMENT_MODE: beta
+      PUBLIC_APP_URL: http://localhost:8080
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
@@ -133,6 +135,8 @@ jobs:
               'vehicles',
               'host',
               'host/new',
+              'host/finance',
+              'payment-return',
           ):
               route_dir = build_dir / route
               route_dir.mkdir(parents=True, exist_ok=True)
@@ -200,7 +204,7 @@ jobs:
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
             | grep --fixed-strings "${GITHUB_SHA}"
 
-          for route in '' register/ login/ bookings/ discover/ search/ profile/ vehicles/ host/ host/new/; do
+          for route in '' register/ login/ bookings/ discover/ search/ profile/ vehicles/ host/ host/new/ host/finance/ payment-return/; do
             headers="$(mktemp)"
             body="$(mktemp)"
             curl --fail --location --show-error --silent --retry 10 --retry-delay 3 \
