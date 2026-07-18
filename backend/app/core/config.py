@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     payment_mode: str = "beta"
     public_app_url: str = "http://localhost:8080"
     platform_fee_basis_points: int = 1500
-    payment_hold_minutes: int = 30
+    payment_hold_minutes: int = 31
 
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
