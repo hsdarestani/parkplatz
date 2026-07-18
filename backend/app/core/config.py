@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     public_app_url: str = "http://localhost:8080"
     platform_fee_basis_points: int = 1500
     payment_hold_minutes: int = 31
+    password_reset_minutes: int = 30
 
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
