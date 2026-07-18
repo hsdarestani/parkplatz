@@ -38,10 +38,14 @@ ensure_env() {
 ensure_env PAYMENT_MODE beta
 ensure_env PUBLIC_APP_URL https://parkplatz.smarbiz.sbs
 ensure_env PLATFORM_FEE_BASIS_POINTS 1500
-ensure_env PAYMENT_HOLD_MINUTES 30
+ensure_env PAYMENT_HOLD_MINUTES 31
 ensure_env STRIPE_COUNTRY DE
 ensure_env STRIPE_SECRET_KEY ""
 ensure_env STRIPE_WEBHOOK_SECRET ""
+
+# Stripe requires Checkout expiration to be at least 30 minutes in the future.
+# Upgrade the earlier default so network latency cannot make the request invalid.
+sed -i 's/^PAYMENT_HOLD_MINUTES=30$/PAYMENT_HOLD_MINUTES=31/' .env.production
 
 chmod 600 .env.production
 
