@@ -12,6 +12,7 @@ class LegalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = _content(section);
+    final isImprint = section == 'imprint';
     return FreiraumScaffold(
       title: content.title,
       subtitle: 'Rechtliche Informationen für FREIRAUM.',
@@ -31,19 +32,21 @@ class LegalScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: T.amberSoft,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: T.amber),
+                  if (!isImprint) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: T.amberSoft,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: T.amber),
+                      ),
+                      child: const Text(
+                        'Entwurf für das MVP. Datenschutz und Nutzungsbedingungen müssen vor dem öffentlichen Release rechtlich geprüft und finalisiert werden.',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
                     ),
-                    child: const Text(
-                      'Entwurf für das MVP. Vor dem öffentlichen Release muss der finale Text rechtlich geprüft und mit den vollständigen Unternehmensdaten ergänzt werden.',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
+                    const SizedBox(height: 18),
+                  ],
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(
@@ -77,7 +80,7 @@ class LegalScreen extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                             const SizedBox(height: 8),
-                            Text(block.$2),
+                            SelectableText(block.$2),
                           ],
                         ),
                       ),
@@ -99,7 +102,7 @@ _LegalContent _content(String section) => switch (section) {
           [
             (
               'Plattformrolle',
-              'FREIRAUM vermittelt Stellplätze zwischen Anbietern und Fahrern. Die konkreten Pflichten der Parteien werden in den finalen Bedingungen festgelegt.',
+              'FREIRAUM wird von der A+ Solution GmbH betrieben und vermittelt Stellplätze zwischen Anbietern und Fahrern. Die konkreten Rechte und Pflichten der Parteien werden in den finalen Nutzungsbedingungen geregelt.',
             ),
             (
               'Buchung und Stornierung',
@@ -109,28 +112,44 @@ _LegalContent _content(String section) => switch (section) {
               'Zulässige Nutzung',
               'Nutzer müssen richtige Angaben machen und Stellplätze sowie Zugangsinformationen verantwortungsvoll verwenden.',
             ),
+            (
+              'Kontakt',
+              'A+ Solution GmbH\nE-Mail: info@aplus-solution.de\nTelefon: +49 69 21000418',
+            ),
           ],
         ),
       'imprint' => const _LegalContent(
           'Impressum',
           [
             (
-              'Anbieter',
-              'Unternehmensname, Rechtsform, vertretungsberechtigte Person und vollständige Anschrift ergänzen.',
+              'Angaben gemäß § 5 DDG',
+              'A+ Solution GmbH\nCarl-Sonnenschein Straße 57\nD-65936 Frankfurt am Main\nDeutschland',
+            ),
+            (
+              'Vertretungsberechtigt',
+              'Geschäftsführer: Ashkan Asadian G.',
             ),
             (
               'Kontakt',
-              'E-Mail: support@freiraum.app\nTelefon und weitere Pflichtangaben vor Veröffentlichung ergänzen.',
+              'Telefon: +49 69 21000418\nMobil: +49 172 7779721\nE-Mail: info@aplus-solution.de\nWebsite: www.aplus-solution.de',
             ),
             (
-              'Register und Steuer',
-              'Registergericht, Registernummer und Umsatzsteuer-ID ergänzen, sofern zutreffend.',
+              'Register und Umsatzsteuer',
+              'Handelsregister: HRB 128570\nUmsatzsteuer-Identifikationsnummer gemäß § 27a UStG: DE296290089',
+            ),
+            (
+              'Verantwortlich für den Inhalt',
+              'A+ Solution GmbH, vertreten durch den Geschäftsführer Ashkan Asadian G.',
             ),
           ],
         ),
       _ => const _LegalContent(
           'Datenschutz',
           [
+            (
+              'Verantwortlicher',
+              'A+ Solution GmbH\nCarl-Sonnenschein Straße 57\nD-65936 Frankfurt am Main\nE-Mail: info@aplus-solution.de',
+            ),
             (
               'Verarbeitete Daten',
               'Kontodaten, Fahrzeugdaten, Buchungen, Zahlungsreferenzen und technische Protokolle werden nur für den Betrieb der Plattform verarbeitet.',
@@ -141,7 +160,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Rechte und Kontakt',
-              'Anfragen zu Auskunft, Berichtigung oder Löschung können an support@freiraum.app gesendet werden.',
+              'Anfragen zu Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung können an info@aplus-solution.de gesendet werden.',
             ),
           ],
         ),
@@ -149,6 +168,7 @@ _LegalContent _content(String section) => switch (section) {
 
 class _LegalContent {
   const _LegalContent(this.title, this.blocks);
+
   final String title;
   final List<(String, String)> blocks;
 }
