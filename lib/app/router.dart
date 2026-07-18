@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/account/presentation/account_controls_screen.dart';
+import '../features/account/presentation/login_entry_screen.dart';
 import '../features/account/presentation/password_recovery_screens.dart';
 import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
@@ -45,8 +46,7 @@ GoRouter createRouter() => GoRouter(
         ),
         GoRoute(
           path: '/login',
-          builder: (context, state) => AuthScreen(
-            register: false,
+          builder: (context, state) => LoginEntryScreen(
             returnTo: state.uri.queryParameters['returnTo'],
           ),
         ),
