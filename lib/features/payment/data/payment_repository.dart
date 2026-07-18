@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -70,6 +72,27 @@ class PaymentCheckoutResult {
   }
 }
 
+class ReceiptUpload {
+  const ReceiptUpload({
+    required this.url,
+    required this.originalName,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  final String url;
+  final String originalName;
+  final String mimeType;
+  final int sizeBytes;
+
+  factory ReceiptUpload.fromJson(Map<String, dynamic> json) => ReceiptUpload(
+        url: json['receipt_url'].toString(),
+        originalName: json['original_name'].toString(),
+        mimeType: json['mime_type'].toString(),
+        sizeBytes: json['size_bytes'] as int,
+      );
+}
+
 class DirectPaymentSettings {
   const DirectPaymentSettings({
     required this.method,
@@ -132,6 +155,9 @@ class PendingDirectPayment {
     required this.paymentMethod,
     required this.payerReference,
     required this.submittedAt,
+    this.responseDueAt,
+    this.receiptUrl,
+    this.receiptOriginalName,
   });
 
   final String paymentId;
@@ -148,6 +174,9 @@ class PendingDirectPayment {
   final String paymentMethod;
   final String payerReference;
   final DateTime submittedAt;
+  final DateTime? responseDueAt;
+  final String? receiptUrl;
+  final String? receiptOriginalName;
 
   factory PendingDirectPayment.fromJson(Map<String, dynamic> json) =>
       PendingDirectPayment(
@@ -165,6 +194,11 @@ class PendingDirectPayment {
         paymentMethod: json['payment_method']?.toString() ?? 'direct',
         payerReference: json['payer_reference']?.toString() ?? '',
         submittedAt: DateTime.parse(json['submitted_at'].toString()),
+        responseDueAt: json['host_response_due_at'] == null
+            ? null
+            : DateTime.parse(json['host_response_due_at'].toString()),
+        receiptUrl: json['receipt_url']?.toString(),
+        receiptOriginalName: json['receipt_original_name']?.toString(),
       );
 }
 
@@ -208,6 +242,7 @@ class HostFinanceTransaction {
     required this.currency,
     this.paidAt,
     this.refundedAt,
+    this.refundReference,
   });
 
   final String id;
@@ -219,6 +254,7 @@ class HostFinanceTransaction {
   final String currency;
   final DateTime? paidAt;
   final DateTime? refundedAt;
+  final String? refundReference;
 
   factory HostFinanceTransaction.fromJson(Map<String, dynamic> json) =>
       HostFinanceTransaction(
@@ -235,6 +271,7 @@ class HostFinanceTransaction {
         refundedAt: json['refunded_at'] == null
             ? null
             : DateTime.parse(json['refunded_at'].toString()),
+        refundReference: json['refund_reference']?.toString(),
       );
 }
 
@@ -281,6 +318,11 @@ abstract interface class PaymentRepository {
   Future<PaymentCheckoutResult> createCheckout(BookingRecord booking);
   Future<PaymentCheckoutResult> checkoutStatus(String sessionId);
   Future<void> submitDirectReference(String bookingId, String reference);
+  Future<ReceiptUpload> uploadReceipt(
+    String bookingId,
+    Uint8List bytes,
+    String filename,
+  );
   Future<DirectPaymentSettings> directSettings();
   Future<DirectPaymentSettings> saveDirectSettings(
     DirectPaymentSettings settings,
@@ -338,6 +380,20 @@ class ApiPaymentRepository implements PaymentRepository {
       body: {'reference': reference.trim()},
     );
   }
+
+  @override
+  Future<ReceiptUpload> uploadReceipt(
+    String bookingId,
+    Uint8List bytes,
+    String filename,
+  ) async =>
+      ReceiptUpload.fromJson(
+        await api.upload(
+          '/payments/bookings/$bookingId/receipt',
+          bytes: bytes,
+          filename: filename,
+        ) as Map<String, dynamic>,
+      );
 
   @override
   Future<DirectPaymentSettings> directSettings() async =>
