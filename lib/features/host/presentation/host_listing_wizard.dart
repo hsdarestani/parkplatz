@@ -6,6 +6,7 @@ import '../../../config/design_tokens.dart';
 import '../../../shared/widgets/freiraum_scaffold.dart';
 import '../../parking/data/providers.dart';
 import '../data/host_repository.dart';
+import '../domain/host_listing_validation.dart';
 
 class HostListingWizardScreen extends ConsumerStatefulWidget {
   const HostListingWizardScreen({super.key});
@@ -58,6 +59,61 @@ class _HostListingWizardScreenState
     super.dispose();
   }
 
+  String? _stepError(int targetStep) => HostListingValidation.errorForStep(
+        targetStep,
+        titleValue: title.text,
+        districtValue: district.text,
+        landmarkValue: landmark.text,
+        addressValue: address.text,
+        latitudeValue: latitude.text,
+        longitudeValue: longitude.text,
+        instructionsValue: instructions.text,
+        heightValue: height.text,
+        widthValue: width.text,
+        lengthValue: length.text,
+        priceValue: price.text,
+      );
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  bool _validateStep(int targetStep) {
+    final error = _stepError(targetStep);
+    formKey.currentState?.validate();
+    if (error == null) return true;
+    setState(() => step = targetStep);
+    _showError(error);
+    return false;
+  }
+
+  void _continue() {
+    if (!_validateStep(step)) return;
+    setState(() => step += 1);
+  }
+
+  void _goToStep(int targetStep) {
+    if (targetStep <= step) {
+      setState(() => step = targetStep);
+      return;
+    }
+
+    for (var current = 0; current < targetStep; current += 1) {
+      if (!_validateStep(current)) return;
+    }
+    setState(() => step = targetStep);
+  }
+
+  StepState _stateFor(int targetStep) {
+    if (step == targetStep) return StepState.editing;
+    if (step > targetStep && _stepError(targetStep) == null) {
+      return StepState.complete;
+    }
+    return StepState.indexed;
+  }
+
   @override
   Widget build(BuildContext context) => FreiraumScaffold(
         title: 'Stellplatz hinzufügen',
@@ -71,34 +127,35 @@ class _HostListingWizardScreenState
               child: Stepper(
                 currentStep: step,
                 type: StepperType.vertical,
-                onStepTapped: (value) => setState(() => step = value),
+                onStepTapped: _goToStep,
                 controlsBuilder: _controls,
                 steps: [
                   Step(
                     title: const Text('Standort'),
                     subtitle: const Text('Adresse und Position'),
                     isActive: step >= 0,
-                    state: step > 0 ? StepState.complete : StepState.indexed,
+                    state: _stateFor(0),
                     content: _locationStep(),
                   ),
                   Step(
                     title: const Text('Stellplatzdetails'),
                     subtitle: const Text('Maße und Zufahrt'),
                     isActive: step >= 1,
-                    state: step > 1 ? StepState.complete : StepState.indexed,
+                    state: _stateFor(1),
                     content: _detailsStep(),
                   ),
                   Step(
                     title: const Text('Ausstattung'),
                     subtitle: const Text('Komfort und Zugang'),
                     isActive: step >= 2,
-                    state: step > 2 ? StepState.complete : StepState.indexed,
+                    state: _stateFor(2),
                     content: _featuresStep(),
                   ),
                   Step(
                     title: const Text('Preis & Veröffentlichung'),
                     subtitle: const Text('Angebot prüfen und online stellen'),
                     isActive: step >= 3,
+                    state: _stateFor(3),
                     content: _publishStep(),
                   ),
                 ],
@@ -113,11 +170,7 @@ class _HostListingWizardScreenState
         child: Row(
           children: [
             FilledButton.icon(
-              onPressed: busy
-                  ? null
-                  : step == 3
-                      ? _submit
-                      : () => setState(() => step += 1),
+              onPressed: busy ? null : step == 3 ? _submit : _continue,
               icon: Icon(step == 3 ? Icons.publish : Icons.arrow_forward),
               label: Text(
                 busy
@@ -153,12 +206,12 @@ class _HostListingWizardScreenState
               labelText: 'Titel',
               hintText: 'z. B. Innenhof nahe Hauptbahnhof',
             ),
-            validator: _required,
+            validator: HostListingValidation.title,
           ),
           TextFormField(
             controller: address,
             decoration: const InputDecoration(labelText: 'Genaue Adresse'),
-            validator: _required,
+            validator: HostListingValidation.address,
           ),
           Wrap(
             spacing: 14,
@@ -169,7 +222,7 @@ class _HostListingWizardScreenState
                 child: TextFormField(
                   controller: district,
                   decoration: const InputDecoration(labelText: 'Stadtteil'),
-                  validator: _required,
+                  validator: HostListingValidation.district,
                 ),
               ),
               SizedBox(
@@ -180,7 +233,7 @@ class _HostListingWizardScreenState
                     labelText: 'Öffentlicher Orientierungspunkt',
                     hintText: 'z. B. nahe Messe Frankfurt',
                   ),
-                  validator: _required,
+                  validator: HostListingValidation.landmark,
                 ),
               ),
             ],
@@ -194,8 +247,11 @@ class _HostListingWizardScreenState
                 child: TextFormField(
                   controller: latitude,
                   decoration: const InputDecoration(labelText: 'Breitengrad'),
-                  keyboardType: TextInputType.number,
-                  validator: _number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
+                  validator: HostListingValidation.latitude,
                 ),
               ),
               SizedBox(
@@ -203,8 +259,11 @@ class _HostListingWizardScreenState
                 child: TextFormField(
                   controller: longitude,
                   decoration: const InputDecoration(labelText: 'Längengrad'),
-                  keyboardType: TextInputType.number,
-                  validator: _number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
+                  validator: HostListingValidation.longitude,
                 ),
               ),
             ],
@@ -224,9 +283,21 @@ class _HostListingWizardScreenState
             spacing: 14,
             runSpacing: 12,
             children: [
-              _dimension(height, 'Max. Höhe in m'),
-              _dimension(width, 'Max. Breite in m'),
-              _dimension(length, 'Max. Länge in m'),
+              _dimension(
+                height,
+                'Max. Höhe in m',
+                HostListingValidation.height,
+              ),
+              _dimension(
+                width,
+                'Max. Breite in m',
+                HostListingValidation.width,
+              ),
+              _dimension(
+                length,
+                'Max. Länge in m',
+                HostListingValidation.length,
+              ),
             ],
           ),
           DropdownButtonFormField<String>(
@@ -255,7 +326,7 @@ class _HostListingWizardScreenState
               labelText: 'Zufahrts- und Einparkhinweise',
               hintText: 'Tor, Stellplatznummer, Schlüssel oder Besonderheiten',
             ),
-            validator: _required,
+            validator: HostListingValidation.instructions,
           ),
         ],
       );
@@ -313,9 +384,10 @@ class _HostListingWizardScreenState
               decoration: const InputDecoration(
                 labelText: 'Preis pro Stunde in €',
                 prefixIcon: Icon(Icons.euro),
+                helperText: 'Erlaubt: 0,50 € bis 1.000 €',
               ),
-              keyboardType: TextInputType.number,
-              validator: _positiveNumber,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: HostListingValidation.price,
             ),
           ),
           Container(
@@ -360,13 +432,18 @@ class _HostListingWizardScreenState
         ),
       );
 
-  Widget _dimension(TextEditingController controller, String label) => SizedBox(
+  Widget _dimension(
+    TextEditingController controller,
+    String label,
+    FormFieldValidator<String> validator,
+  ) =>
+      SizedBox(
         width: 220,
         child: TextFormField(
           controller: controller,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(labelText: label),
-          validator: _positiveNumber,
+          validator: validator,
         ),
       );
 
@@ -376,7 +453,8 @@ class _HostListingWizardScreenState
     IconData icon,
     bool value,
     ValueChanged<bool> onChanged,
-  ) => SwitchListTile(
+  ) =>
+      SwitchListTile(
         contentPadding: EdgeInsets.zero,
         secondary: Icon(icon, color: value ? T.success : T.muted),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -385,46 +463,29 @@ class _HostListingWizardScreenState
         onChanged: onChanged,
       );
 
-  String? _required(String? value) => value == null || value.trim().length < 2
-      ? 'Bitte ausfüllen.'
-      : null;
-
-  String? _number(String? value) =>
-      _parse(value) == null ? 'Bitte gültige Zahl eingeben.' : null;
-
-  String? _positiveNumber(String? value) {
-    final parsed = _parse(value);
-    return parsed == null || parsed <= 0 ? 'Bitte Wert größer 0 eingeben.' : null;
-  }
-
-  double? _parse(String? value) =>
-      double.tryParse((value ?? '').trim().replaceAll(',', '.'));
-
   Future<void> _submit() async {
-    if (!(formKey.currentState?.validate() ?? false)) {
-      setState(() => step = 0);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte prüfe alle Pflichtfelder.')),
-      );
-      return;
+    for (var targetStep = 0; targetStep < 4; targetStep += 1) {
+      if (!_validateStep(targetStep)) return;
     }
+
     setState(() => busy = true);
     try {
-      final hourlyPriceCents = ((_parse(price.text) ?? 0) * 100).round();
+      final hourlyPriceCents =
+          (HostListingValidation.parseNumber(price.text)! * 100).round();
       await ref.read(hostRepositoryProvider).create(
             HostSpaceRecord(
               id: '',
               title: title.text.trim(),
               district: district.text.trim(),
               landmark: landmark.text.trim(),
-              latitude: _parse(latitude.text)!,
-              longitude: _parse(longitude.text)!,
+              latitude: HostListingValidation.parseNumber(latitude.text)!,
+              longitude: HostListingValidation.parseNumber(longitude.text)!,
               exactAddress: address.text.trim(),
               entranceInstructions: instructions.text.trim(),
               hourlyPriceCents: hourlyPriceCents,
-              maxHeight: _parse(height.text)!,
-              maxWidth: _parse(width.text)!,
-              maxLength: _parse(length.text)!,
+              maxHeight: HostListingValidation.parseNumber(height.text)!,
+              maxWidth: HostListingValidation.parseNumber(width.text)!,
+              maxLength: HostListingValidation.parseNumber(length.text)!,
               accessType: accessType,
               covered: covered,
               evCharging: evCharging,
@@ -442,11 +503,7 @@ class _HostListingWizardScreenState
         context.go('/host');
       }
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
-      }
+      if (mounted) _showError(error.toString());
     } finally {
       if (mounted) setState(() => busy = false);
     }
