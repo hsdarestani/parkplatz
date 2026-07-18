@@ -68,10 +68,15 @@ class Payment(Timestamp, Base):
         String(255),
         nullable=True,
     )
+    payment_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    payer_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    host_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     failure_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
