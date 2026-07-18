@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -11,6 +11,7 @@ from app.models import (
     Booking,
     BookingStatus,
     ParkingSpace,
+    Payment,
 )
 
 FRANKFURT_TIMEZONE = ZoneInfo("Europe/Berlin")
@@ -91,12 +92,22 @@ async def evaluate_availability(
             hourly_price_cents=parking_space.hourly_price_cents,
         )
 
+    now = datetime.now(timezone.utc)
     overlapping_booking = await db.scalar(
-        select(Booking.id).where(
+        select(Booking.id)
+        .outerjoin(Payment, Payment.booking_id == Booking.id)
+        .where(
             Booking.parking_space_id == parking_space.id,
-            Booking.status.in_([BookingStatus.pending, BookingStatus.confirmed]),
             Booking.start_at < end_at,
             Booking.end_at > start_at,
+            or_(
+                Booking.status == BookingStatus.confirmed,
+                and_(
+                    Booking.status == BookingStatus.pending,
+                    Payment.status.in_(["pending", "checkout_created", "paid"]),
+                    Payment.expires_at > now,
+                ),
+            ),
         )
     )
     if overlapping_booking is not None:
