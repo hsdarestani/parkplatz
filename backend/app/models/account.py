@@ -22,6 +22,26 @@ class NotificationPreference(Timestamp, Base):
     marketing: Mapped[bool] = mapped_column(default=False)
 
 
+class HostSubscription(Timestamp, Base):
+    __tablename__ = "host_subscriptions"
+    __table_args__ = (Index("ix_host_subscriptions_plan_status", "plan", "status"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    plan: Mapped[str] = mapped_column(String(16), default="free")
+    status: Mapped[str] = mapped_column(String(24), default="active")
+    requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    active_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
     __table_args__ = (
