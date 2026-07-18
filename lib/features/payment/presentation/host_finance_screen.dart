@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/design_tokens.dart';
 import '../../../shared/widgets/freiraum_motion.dart';
 import '../../../shared/widgets/freiraum_scaffold.dart';
 import '../data/payment_repository.dart';
+import 'host_launch_operations_panel.dart';
 
 class HostFinanceScreen extends ConsumerStatefulWidget {
   const HostFinanceScreen({super.key});
@@ -57,7 +59,7 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
   @override
   Widget build(BuildContext context) => FreiraumScaffold(
         title: 'Zahlungen & Bestätigungen',
-        subtitle: 'Direkte Zahlung an dich einrichten und Buchungen bestätigen.',
+        subtitle: 'Direktzahlung, Tarif, Belege und Rückerstattungen verwalten.',
         activePath: '/host',
         actions: [
           OutlinedButton.icon(
@@ -115,6 +117,11 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
                   children: [
                     MotionReveal(child: _hero(data)),
                     const SizedBox(height: 18),
+                    const MotionReveal(
+                      delay: Duration(milliseconds: 45),
+                      child: HostLaunchOperationsPanel(),
+                    ),
+                    const SizedBox(height: 22),
                     MotionReveal(
                       delay: const Duration(milliseconds: 70),
                       child: _settingsCard(data.settings),
@@ -300,7 +307,9 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: Text(saving ? 'Wird gespeichert …' : 'Zahlungsmethode speichern'),
+                label: Text(
+                  saving ? 'Wird gespeichert …' : 'Zahlungsmethode speichern',
+                ),
               ),
             ),
           ],
@@ -328,7 +337,10 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
                 ),
                 if (values.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: T.amberSoft,
                       borderRadius: BorderRadius.circular(999),
@@ -338,7 +350,7 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
               ],
             ),
             const Text(
-              'Prüfe den Eingang in deinem PayPal-, Revolut- oder Bankkonto.',
+              'Prüfe den Eingang und reagiere vor Ablauf der angezeigten Frist.',
               style: TextStyle(color: T.muted),
             ),
             const SizedBox(height: 16),
@@ -361,6 +373,7 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
 
   Widget _pendingTile(PendingDirectPayment item) {
     final working = deciding.contains(item.paymentId);
+    final due = item.responseDueAt;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(17),
@@ -390,6 +403,14 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
             '${_date(item.start)} – ${_date(item.end)}',
             style: const TextStyle(color: T.muted),
           ),
+          if (due != null)
+            Text(
+              'Entscheidung bis ${_date(due)}',
+              style: const TextStyle(
+                color: T.warning,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           const SizedBox(height: 10),
           SelectableText(
             'Zahlungsreferenz: ${item.payerReference}',
@@ -401,6 +422,12 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
             runSpacing: 8,
             alignment: WrapAlignment.end,
             children: [
+              if (item.receiptUrl != null)
+                OutlinedButton.icon(
+                  onPressed: working ? null : () => _openReceipt(item.receiptUrl!),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: Text(item.receiptOriginalName ?? 'Beleg öffnen'),
+                ),
               OutlinedButton.icon(
                 onPressed: working ? null : () => _reject(item),
                 icon: const Icon(Icons.close),
@@ -454,12 +481,14 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
                     (item) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
-                        item.status == 'paid'
+                        item.status == 'paid' || item.status == 'refunded'
                             ? Icons.check_circle_outline
                             : item.status == 'refund_required'
                                 ? Icons.undo_outlined
                                 : Icons.schedule_outlined,
-                        color: item.status == 'paid' ? T.success : T.warning,
+                        color: item.status == 'paid' || item.status == 'refunded'
+                            ? T.success
+                            : T.warning,
                       ),
                       title: Text('Buchung ${item.bookingId.substring(0, 8)}'),
                       subtitle: Text(_statusLabel(item.status)),
@@ -472,6 +501,21 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
           ],
         ),
       );
+
+  Future<void> _openReceipt(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return;
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: '_blank',
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Beleg konnte nicht geöffnet werden.')),
+      );
+    }
+  }
 
   Future<void> _saveSettings() async {
     setState(() => saving = true);
@@ -508,7 +552,7 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
     final controller = TextEditingController();
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Zahlung nicht erhalten?'),
         content: TextField(
           controller: controller,
@@ -516,12 +560,12 @@ class _HostFinanceScreenState extends ConsumerState<HostFinanceScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Abbrechen'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(
-              context,
+              dialogContext,
               controller.text.trim().isEmpty
                   ? 'Zahlung konnte nicht gefunden werden.'
                   : controller.text.trim(),
@@ -615,6 +659,7 @@ String _statusLabel(String value) => switch (value) {
       'refund_required' => 'Direkte Rückerstattung erforderlich',
       'refunded' => 'Erstattet',
       'rejected' => 'Nicht bestätigt',
+      'host_timeout' => 'Bestätigungsfrist abgelaufen',
       'cancelled' => 'Storniert',
       'failed' => 'Fehlgeschlagen',
       'expired' => 'Abgelaufen',
