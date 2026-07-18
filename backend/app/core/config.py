@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     platform_fee_basis_points: int = 1500
     payment_hold_minutes: int = 31
     direct_payment_hold_hours: int = 24
+    free_host_response_hours: int = 12
+    pro_host_response_hours: int = 6
+    free_listing_limit: int = 1
+    pro_listing_limit: int = 10
+    receipt_upload_dir: str = "/var/lib/freiraum/uploads"
+    receipt_max_bytes: int = 5_242_880
     password_reset_minutes: int = 30
 
     stripe_secret_key: str = ""
