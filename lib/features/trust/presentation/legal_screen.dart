@@ -12,14 +12,13 @@ class LegalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = _content(section);
-    final isImprint = section == 'imprint';
     return FreiraumScaffold(
       title: content.title,
-      subtitle: 'Rechtliche Informationen für FREIRAUM.',
+      subtitle: 'Rechtliche Informationen für FREIRAUM Public Beta.',
       activePath: '/trust',
       actions: [
         IconButton(
-          onPressed: () => context.go('/trust'),
+          onPressed: () => context.go('/'),
           icon: const Icon(Icons.close),
         ),
       ],
@@ -32,21 +31,19 @@ class LegalScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!isImprint) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: T.amberSoft,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: T.amber),
-                      ),
-                      child: const Text(
-                        'Entwurf für das MVP. Datenschutz und Nutzungsbedingungen müssen vor dem öffentlichen Release rechtlich geprüft und finalisiert werden.',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: T.mintSoft,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: T.mint),
                     ),
-                    const SizedBox(height: 18),
-                  ],
+                    child: const Text(
+                      'FREIRAUM befindet sich in einer öffentlichen Beta. Diese Informationen gelten für den aktuellen Funktionsumfang; wesentliche Änderungen werden an dieser Stelle veröffentlicht.',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(
@@ -102,15 +99,31 @@ _LegalContent _content(String section) => switch (section) {
           [
             (
               'Plattformrolle',
-              'FREIRAUM wird von der A+ Solution GmbH betrieben und vermittelt Stellplätze zwischen Anbietern und Fahrern. Die konkreten Rechte und Pflichten der Parteien werden in den finalen Nutzungsbedingungen geregelt.',
+              'FREIRAUM wird von der A+ Solution GmbH betrieben und vermittelt die technische Kontaktaufnahme und Buchungsabwicklung zwischen Parkplatzanbietern und Fahrern. FREIRAUM ist nicht Eigentümer oder Betreiber der angebotenen Stellplätze.',
             ),
             (
-              'Buchung und Stornierung',
-              'Preise, Zeiträume, Zahlungsstatus und Stornierungsfolgen werden vor Abschluss transparent angezeigt.',
+              'Direktzahlung',
+              'Zahlungen erfolgen direkt vom Fahrer an den Anbieter über PayPal, Revolut oder SEPA. FREIRAUM nimmt, verwahrt oder überweist dabei keine Kundengelder. Zahlungsreferenzen und optional hochgeladene Belege dienen der Dokumentation und Prüfung.',
             ),
             (
-              'Zulässige Nutzung',
-              'Nutzer müssen richtige Angaben machen und Stellplätze sowie Zugangsinformationen verantwortungsvoll verwenden.',
+              'Buchungsbestätigung',
+              'Eine Buchung wird erst bestätigt, wenn der Anbieter den Zahlungseingang innerhalb der angezeigten Frist bestätigt. Erst danach werden die genaue Adresse, Zugangsinformationen und der Parking Pass freigeschaltet.',
+            ),
+            (
+              'Stornierung und Rückerstattung',
+              'Bei einer stornierbaren, bereits bestätigten Direktzahlung führt der Anbieter die Rückerstattung außerhalb von FREIRAUM durch und dokumentiert die Erstattungsreferenz anschließend in der Plattform.',
+            ),
+            (
+              'Pflichten der Nutzer',
+              'Nutzer müssen richtige Angaben machen, nur berechtigte Stellplätze anbieten, Zahlungsinformationen sorgfältig prüfen und Stellplätze, Fahrzeuge sowie Zugangsdaten verantwortungsvoll verwenden. Missbrauch, Täuschung und rechtswidrige Inhalte sind untersagt.',
+            ),
+            (
+              'Beta-Betrieb und Verfügbarkeit',
+              'FREIRAUM wird als Public Beta bereitgestellt. Funktionen können erweitert oder angepasst werden. Für planbare Wartung, technische Störungen oder Ausfälle kann keine ununterbrochene Verfügbarkeit zugesichert werden.',
+            ),
+            (
+              'Free und Pro',
+              'Der aktuelle Free-Plan umfasst die grundlegenden Anbieterfunktionen. Pro-Funktionen können während der Beta auf Anfrage freigeschaltet werden. Kostenpflichtige Preise werden vor einer späteren Aktivierung transparent angezeigt und nicht rückwirkend berechnet.',
             ),
             (
               'Kontakt',
@@ -127,7 +140,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Vertretungsberechtigt',
-              'Geschäftsführer: Ashkan Asadian G.',
+              'Geschäftsführer: Ashkan Asadian Ghahferokhi',
             ),
             (
               'Kontakt',
@@ -139,7 +152,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Verantwortlich für den Inhalt',
-              'A+ Solution GmbH, vertreten durch den Geschäftsführer Ashkan Asadian G.',
+              'A+ Solution GmbH, vertreten durch den Geschäftsführer Ashkan Asadian Ghahferokhi.',
             ),
           ],
         ),
@@ -152,15 +165,35 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Verarbeitete Daten',
-              'Kontodaten, Fahrzeugdaten, Buchungen, Zahlungsreferenzen und technische Protokolle werden nur für den Betrieb der Plattform verarbeitet.',
+              'Verarbeitet werden insbesondere Konto- und Kontaktdaten, Fahrzeugdaten, Stellplatzinformationen, Buchungs- und Zeitdaten, Zahlungsreferenzen, freiwillig hochgeladene Zahlungsbelege, Support- und Prüfungsangaben sowie technisch notwendige Sicherheitsprotokolle.',
+            ),
+            (
+              'Zwecke und Rechtsgrundlagen',
+              'Die Verarbeitung erfolgt zur Registrierung, Vermittlung und Durchführung von Buchungen, zur Zahlungs- und Rückerstattungsdokumentation, zur Kommunikation, zur Missbrauchsprävention und zur technischen Sicherheit. Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b, c und f DSGVO; optionale Marketingnachrichten werden nur mit entsprechender Einwilligung versendet.',
             ),
             (
               'Geschützte Standortdaten',
-              'Genaue Stellplatzadressen und Zugangsdaten werden erst nach einer bestätigten Buchung angezeigt.',
+              'Genaue Stellplatzadressen, Zugangscodes und Einfahrthinweise werden erst nach einer bestätigten Buchung für den berechtigten Fahrer angezeigt.',
             ),
             (
-              'Rechte und Kontakt',
-              'Anfragen zu Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung können an info@aplus-solution.de gesendet werden.',
+              'Direkte Zahlungsanbieter',
+              'Bei PayPal-, Revolut- oder Bankzahlungen verlassen Nutzer FREIRAUM beziehungsweise nutzen Dienste Dritter. Für deren eigenständige Datenverarbeitung gelten die Datenschutzinformationen des jeweiligen Zahlungsanbieters oder Kreditinstituts.',
+            ),
+            (
+              'Empfänger und Hosting',
+              'Daten werden nur an technisch notwendige Dienstleister, Hosting- und E-Mail-Anbieter sowie im erforderlichen Umfang an den jeweiligen Buchungspartner übermittelt. Eine Weitergabe an Werbetreibende oder ein Verkauf personenbezogener Daten findet nicht statt.',
+            ),
+            (
+              'Speicherdauer',
+              'Daten werden nur so lange gespeichert, wie sie für den Betrieb, die Buchungsabwicklung, Sicherheits- und Nachweiszwecke oder gesetzliche Aufbewahrungspflichten erforderlich sind. Kontodaten können über die Kontofunktionen zur Löschung angefordert werden, soweit keine gesetzlichen Gründe entgegenstehen.',
+            ),
+            (
+              'Rechte',
+              'Betroffene Personen haben im gesetzlichen Rahmen insbesondere Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch nach Art. 15 bis 22 DSGVO. Außerdem besteht ein Beschwerderecht bei einer Datenschutzaufsichtsbehörde gemäß Art. 77 DSGVO.',
+            ),
+            (
+              'Kontakt',
+              'Datenschutzanfragen können an info@aplus-solution.de gesendet werden.',
             ),
           ],
         ),
