@@ -3,15 +3,25 @@
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="FREIRAUM – Parkplatz-Sharing Demo für Deutschland">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="FREIRAUM verbindet freie private Stellplätze mit Fahrerinnen und Fahrern in Deutschland.">
+  <meta name="theme-color" content="#0B1726">
+  <meta name="application-name" content="FREIRAUM">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="de_DE">
+  <meta property="og:title" content="FREIRAUM · Ankommen, ohne zu suchen.">
+  <meta property="og:description" content="Private Stellplätze finden, buchen und nach Bestätigung den Parking Pass erhalten.">
+  <meta property="og:url" content="https://parkplatz.smarbiz.sbs/">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>FREIRAUM · Ankommen, ohne zu suchen.</title>
+  <link rel="canonical" href="https://parkplatz.smarbiz.sbs/">
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
 </head>
 <body>
+  <noscript>FREIRAUM benötigt JavaScript.</noscript>
   <script>
     (async function () {
       const resetKey = 'freiraum-service-worker-reset-20260718-v3';
@@ -21,11 +31,7 @@
         const nextPath = window.location.pathname === '/'
           ? legacyPath
           : window.location.pathname;
-        window.history.replaceState(
-          null,
-          '',
-          nextPath + window.location.search
-        );
+        window.history.replaceState(null, '', nextPath + window.location.search);
       }
 
       try {
