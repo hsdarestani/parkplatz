@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -118,6 +119,44 @@ class ApiClient {
     await _request('DELETE', path);
   }
 
+  Future<dynamic> upload(
+    String path, {
+    required Uint8List bytes,
+    required String filename,
+    String field = 'file',
+    bool retried = false,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    request.headers['Accept'] = 'application/json';
+    final token = await tokens.readAccess();
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      http.MultipartFile.fromBytes(field, bytes, filename: filename),
+    );
+
+    http.Response response;
+    try {
+      response = await http.Response.fromStream(
+        await client.send(request).timeout(const Duration(seconds: 30)),
+      );
+    } on TimeoutException catch (_) {
+      throw const ApiOfflineException();
+    } on http.ClientException catch (_) {
+      throw const ApiOfflineException();
+    }
+
+    if (response.statusCode == 401 && !retried && await _refresh()) {
+      return upload(
+        path,
+        bytes: bytes,
+        filename: filename,
+        field: field,
+        retried: true,
+      );
+    }
+    return _decodeResponse(response);
+  }
+
   Future<dynamic> _request(
     String method,
     String path, {
@@ -162,6 +201,10 @@ class ApiClient {
         retried: true,
       );
     }
+    return _decodeResponse(response);
+  }
+
+  Future<dynamic> _decodeResponse(http.Response response) async {
     if (response.statusCode == 204) return null;
 
     dynamic decoded;
