@@ -33,15 +33,19 @@ ensure_env() {
   fi
 }
 
-# Payments remain in safe beta mode until real Stripe secrets are added to the
-# server and PAYMENT_MODE is deliberately changed to stripe.
-ensure_env PAYMENT_MODE beta
+# MVP payments are sent directly from renter to parking owner. Stripe remains
+# available as a future optional provider but is not required for this mode.
+ensure_env PAYMENT_MODE direct
 ensure_env PUBLIC_APP_URL https://parkplatz.smarbiz.sbs
 ensure_env PLATFORM_FEE_BASIS_POINTS 1500
 ensure_env PAYMENT_HOLD_MINUTES 31
+ensure_env DIRECT_PAYMENT_HOLD_HOURS 24
 ensure_env STRIPE_COUNTRY DE
 ensure_env STRIPE_SECRET_KEY ""
 ensure_env STRIPE_WEBHOOK_SECRET ""
+
+# Move existing beta installations to the selected direct-payment MVP mode.
+sed -i 's/^PAYMENT_MODE=beta$/PAYMENT_MODE=direct/' .env.production
 
 # Trust moderation is locked unless one or more comma-separated admin emails
 # are deliberately configured on the server.
@@ -62,7 +66,7 @@ ensure_env PASSWORD_RESET_MINUTES 30
 sed -i 's/^TRUST_SUPPORT_EMAIL=support@freiraum\.app$/TRUST_SUPPORT_EMAIL=info@aplus-solution.de/' .env.production
 
 # Stripe requires Checkout expiration to be at least 30 minutes in the future.
-# Upgrade the earlier default so network latency cannot make the request invalid.
+# Keep the safe value for installations that later switch Stripe back on.
 sed -i 's/^PAYMENT_HOLD_MINUTES=30$/PAYMENT_HOLD_MINUTES=31/' .env.production
 
 chmod 600 .env.production
