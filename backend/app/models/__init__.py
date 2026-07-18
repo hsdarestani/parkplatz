@@ -13,6 +13,7 @@ from .base import (
     User,
     Vehicle,
 )
+from .direct_payment import HostDirectPaymentSettings
 from .payment import HostPaymentAccount, Payment, PaymentWebhookEvent
 from .trust import NotificationOutbox, SafetyReport, VerificationRequest
 
@@ -24,6 +25,7 @@ __all__ = [
     "Booking",
     "BookingEvent",
     "BookingStatus",
+    "HostDirectPaymentSettings",
     "HostPaymentAccount",
     "NotificationOutbox",
     "NotificationPreference",
