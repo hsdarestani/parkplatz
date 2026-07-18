@@ -15,8 +15,8 @@ import '../features/host/presentation/host_listing_wizard.dart';
 import '../features/host/presentation/host_manage_screen.dart';
 import '../features/host/presentation/host_operations_dashboard.dart';
 import '../features/launch/launch_screen.dart';
+import '../features/payment/presentation/direct_payment_checkout_screen.dart';
 import '../features/payment/presentation/host_finance_screen.dart';
-import '../features/payment/presentation/payment_checkout_screen.dart';
 import '../features/payment/presentation/payment_return_screen.dart';
 import '../features/trust/presentation/admin_trust_screen.dart';
 import '../features/trust/presentation/legal_screen.dart';
@@ -73,7 +73,7 @@ GoRouter createRouter() => GoRouter(
             final path = '/checkout/${state.pathParameters['id']}';
             return _protected(
               path,
-              PaymentCheckoutScreen(id: state.pathParameters['id']!),
+              DirectPaymentCheckoutScreen(id: state.pathParameters['id']!),
             );
           },
         ),
