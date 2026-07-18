@@ -11,6 +11,7 @@ from .base import (
     User,
     Vehicle,
 )
+from .payment import HostPaymentAccount, Payment, PaymentWebhookEvent
 
 __all__ = [
     "AvailabilityBlock",
@@ -19,8 +20,11 @@ __all__ = [
     "Booking",
     "BookingEvent",
     "BookingStatus",
+    "HostPaymentAccount",
     "ParkingSpace",
     "ParkingSpaceImage",
+    "Payment",
+    "PaymentWebhookEvent",
     "RefreshToken",
     "User",
     "Vehicle",
