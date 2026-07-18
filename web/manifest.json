@@ -1,0 +1,21 @@
+{
+  "name": "FREIRAUM – Parkplatz Sharing",
+  "short_name": "FREIRAUM",
+  "description": "Private Stellplätze finden, buchen und verwalten.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F2EA",
+  "theme_color": "#0B1726",
+  "lang": "de-DE",
+  "categories": ["travel", "navigation", "utilities"],
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
