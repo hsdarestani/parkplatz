@@ -11,10 +11,12 @@ import '../features/booking/presentation/direct_my_bookings_screen.dart';
 import '../features/booking/presentation/premium_confirmation_pass.dart';
 import '../features/booking/presentation/premium_parking_detail.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
+import '../features/favorites/presentation/favorites_screen.dart';
 import '../features/host/presentation/host_listing_wizard.dart';
 import '../features/host/presentation/host_manage_screen.dart';
 import '../features/host/presentation/host_operations_dashboard.dart';
 import '../features/launch/launch_screen.dart';
+import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/payment/presentation/direct_payment_checkout_screen.dart';
 import '../features/payment/presentation/host_finance_screen.dart';
 import '../features/payment/presentation/payment_return_screen.dart';
@@ -32,12 +34,20 @@ GoRouter createRouter() => GoRouter(
       routes: [
         GoRoute(path: '/', builder: (context, state) => const LaunchScreen()),
         GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => const OnboardingScreen(),
+        ),
+        GoRoute(
           path: '/discover',
           builder: (context, state) => const DiscoveryScreen(),
         ),
         GoRoute(
           path: '/search',
           builder: (context, state) => const DiscoveryScreen(results: true),
+        ),
+        GoRoute(
+          path: '/favorites',
+          builder: (context, state) => const FavoritesScreen(),
         ),
         GoRoute(
           path: '/parking/:id',
