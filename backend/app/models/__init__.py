@@ -1,3 +1,4 @@
+from .account import AdminAuditLog, NotificationPreference, PasswordResetToken
 from .base import (
     AvailabilityBlock,
     AvailabilityRule,
@@ -15,6 +16,7 @@ from .payment import HostPaymentAccount, Payment, PaymentWebhookEvent
 from .trust import NotificationOutbox, SafetyReport, VerificationRequest
 
 __all__ = [
+    "AdminAuditLog",
     "AvailabilityBlock",
     "AvailabilityRule",
     "Base",
@@ -23,8 +25,10 @@ __all__ = [
     "BookingStatus",
     "HostPaymentAccount",
     "NotificationOutbox",
+    "NotificationPreference",
     "ParkingSpace",
     "ParkingSpaceImage",
+    "PasswordResetToken",
     "Payment",
     "PaymentWebhookEvent",
     "RefreshToken",
