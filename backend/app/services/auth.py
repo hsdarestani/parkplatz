@@ -57,7 +57,11 @@ class AuthService:
         user = await db.scalar(
             select(User).where(User.email == email.strip().lower())
         )
-        if user is None or not verify_password(password, user.password_hash):
+        if (
+            user is None
+            or not user.is_active
+            or not verify_password(password, user.password_hash)
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -69,6 +73,8 @@ class AuthService:
 
     @staticmethod
     async def _tokens(db: AsyncSession, user: User) -> dict[str, Any]:
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         raw_refresh_token = refresh_token()
         db.add(
             RefreshToken(
