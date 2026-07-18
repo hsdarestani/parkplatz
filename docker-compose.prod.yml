@@ -22,4 +22,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+  notifications:
+    build: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.notifications"]
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
 volumes: {freiraum_postgres: {}}
