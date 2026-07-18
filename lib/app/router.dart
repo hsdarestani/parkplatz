@@ -5,6 +5,9 @@ import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
 import '../features/booking/presentation/booking_screens.dart';
 import '../features/booking/presentation/my_bookings_screen.dart';
+import '../features/booking/presentation/premium_checkout.dart';
+import '../features/booking/presentation/premium_confirmation_pass.dart';
+import '../features/booking/presentation/premium_parking_detail.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
 import '../features/host/presentation/host_dashboard_screen.dart';
 import '../features/host/presentation/host_listing_wizard.dart';
@@ -28,7 +31,7 @@ GoRouter createRouter() => GoRouter(
         GoRoute(
           path: '/parking/:id',
           builder: (context, state) =>
-              ParkingDetailScreen(id: state.pathParameters['id']!),
+              PremiumParkingDetailScreen(id: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/login',
@@ -50,7 +53,7 @@ GoRouter createRouter() => GoRouter(
             final path = '/checkout/${state.pathParameters['id']}';
             return _protected(
               path,
-              CheckoutScreen(id: state.pathParameters['id']!),
+              PremiumCheckoutScreen(id: state.pathParameters['id']!),
             );
           },
         ),
@@ -60,7 +63,7 @@ GoRouter createRouter() => GoRouter(
             final path = '/booking/${state.pathParameters['id']}/confirmed';
             return _protected(
               path,
-              ConfirmationScreen(id: state.pathParameters['id']!),
+              PremiumConfirmationScreen(id: state.pathParameters['id']!),
             );
           },
         ),
@@ -75,7 +78,7 @@ GoRouter createRouter() => GoRouter(
             final path = '/bookings/${state.pathParameters['id']}/pass';
             return _protected(
               path,
-              ParkingPassScreen(id: state.pathParameters['id']!),
+              PremiumParkingPassScreen(id: state.pathParameters['id']!),
             );
           },
         ),
