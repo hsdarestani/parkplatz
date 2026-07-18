@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.account_routes import router as account_router
 from app.api.host_schedule_routes import router as host_schedule_router
 from app.api.payment_routes import router as payment_router
 from app.api.routes import router
@@ -12,6 +13,7 @@ app.include_router(router)
 app.include_router(host_schedule_router)
 app.include_router(payment_router)
 app.include_router(trust_router)
+app.include_router(account_router)
 
 
 @app.middleware("http")
