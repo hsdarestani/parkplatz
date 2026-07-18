@@ -23,7 +23,7 @@ class TrustOverview {
         openReports: json['open_reports'] as int? ?? 0,
         verifiedSpaces: json['verified_spaces'] as int? ?? 0,
         isAdmin: json['is_admin'] == true,
-        supportEmail: json['support_email'] as String? ?? 'support@freiraum.app',
+        supportEmail: json['support_email'] as String? ?? 'info@aplus-solution.de',
       );
 }
 
@@ -134,6 +134,35 @@ class AdminTrustQueue {
       );
 }
 
+class AdminAuditRecord {
+  const AdminAuditRecord({
+    required this.id,
+    required this.action,
+    required this.targetType,
+    required this.targetId,
+    required this.createdAt,
+    required this.metadata,
+  });
+
+  final String id;
+  final String action;
+  final String targetType;
+  final String targetId;
+  final DateTime createdAt;
+  final Map<String, dynamic> metadata;
+
+  factory AdminAuditRecord.fromJson(Map<String, dynamic> json) => AdminAuditRecord(
+        id: json['id'].toString(),
+        action: json['action'] as String,
+        targetType: json['target_type'] as String,
+        targetId: json['target_id'].toString(),
+        createdAt: DateTime.parse(json['created_at'] as String),
+        metadata: Map<String, dynamic>.from(
+          json['metadata'] as Map? ?? const <String, dynamic>{},
+        ),
+      );
+}
+
 class TrustRepository {
   const TrustRepository(this.api);
 
@@ -198,6 +227,15 @@ class TrustRepository {
   Future<AdminTrustQueue> adminQueue() async => AdminTrustQueue.fromJson(
         await api.get('/admin/trust/queue') as Map<String, dynamic>,
       );
+
+  Future<List<AdminAuditRecord>> auditLog() async =>
+      (await api.get('/admin/audit-log') as List)
+          .map(
+            (value) => AdminAuditRecord.fromJson(
+              value as Map<String, dynamic>,
+            ),
+          )
+          .toList();
 
   Future<void> reviewVerification(
     String id, {
