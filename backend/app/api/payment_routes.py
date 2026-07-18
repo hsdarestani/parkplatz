@@ -25,6 +25,13 @@ from app.schemas.direct_payment import (
     DirectPaymentSettingsIn,
 )
 from app.services.direct_payments import DirectPaymentService
+from app.services.launch_operations import (
+    decide_with_notifications,
+    pending_confirmations,
+    queue_refund_required,
+    receipt_url,
+    submit_reference_with_deadline,
+)
 from app.services.payment_lifecycle import cancel_unpaid_checkout
 from app.services.payments import PaymentService, payment_out
 
@@ -38,7 +45,11 @@ def _payment_out(payment: Payment) -> dict[str, Any]:
         payer_reference=payment.payer_reference,
         submitted_at=payment.submitted_at,
         host_confirmed_at=payment.host_confirmed_at,
+        host_response_due_at=payment.host_response_due_at,
         rejected_at=payment.rejected_at,
+        receipt_url=receipt_url(payment),
+        receipt_original_name=payment.receipt_original_name,
+        refund_reference=payment.refund_reference,
     )
     return result
 
@@ -122,12 +133,7 @@ async def submit_direct_payment_reference(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    return await DirectPaymentService.submit_reference(
-        db,
-        user_id,
-        booking_id,
-        data,
-    )
+    return await submit_reference_with_deadline(db, user_id, booking_id, data)
 
 
 @router.get("/payments/bookings/{booking_id}")
@@ -202,6 +208,8 @@ async def cancel_paid_booking(
             },
         )
     )
+    if payment is not None and payment.status == "refund_required":
+        await queue_refund_required(db, booking, payment)
     await db.commit()
     parking_space = await db.get(ParkingSpace, booking.parking_space_id)
     vehicle = await db.get(Vehicle, booking.vehicle_id)
@@ -250,7 +258,7 @@ async def host_pending_direct_payments(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
-    return await DirectPaymentService.pending_for_host(db, user_id)
+    return await pending_confirmations(db, user_id)
 
 
 @router.post("/host/payments/direct/{payment_id}/decision")
@@ -260,7 +268,7 @@ async def decide_direct_payment(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    return await DirectPaymentService.decide(db, user_id, payment_id, data)
+    return await decide_with_notifications(db, user_id, payment_id, data)
 
 
 @router.get("/host/payments/connect/status")
