@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../booking/data/owner_aware_availability_repository.dart';
 import '../../booking/data/repositories.dart';
 import '../../../shared/models/models.dart';
 import '../../search/presentation/search_controller.dart';
@@ -39,7 +40,9 @@ final availabilityRepositoryProvider = Provider<AvailabilityRepository>((ref) {
   final mode = ref.watch(appModeProvider);
   return _forMode(
     mode,
-    () => ApiAvailabilityRepository(ref.watch(apiClientProvider)),
+    () => OwnerAwareApiAvailabilityRepository(
+      ref.watch(apiClientProvider),
+    ),
     LocalAvailabilityRepository.new,
   );
 });
