@@ -1,0 +1,175 @@
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import current_user
+from app.db.session import get_session
+from app.models import Booking, BookingEvent, BookingStatus, ParkingSpace, Payment, Vehicle
+from app.schemas.api import BookingIn, CancelIn
+from app.services.payments import PaymentService, payment_out
+
+router = APIRouter(prefix="/api")
+
+
+def _booking_out(
+    booking: Booking,
+    parking_space: ParkingSpace | None,
+    vehicle: Vehicle | None,
+    payment: Payment | None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "id": str(booking.id),
+        "public_reference": booking.public_reference,
+        "parking_space_id": str(booking.parking_space_id),
+        "vehicle_id": str(booking.vehicle_id),
+        "start_at": booking.start_at,
+        "end_at": booking.end_at,
+        "status": booking.status,
+        "hourly_price_cents_snapshot": booking.hourly_price_cents_snapshot,
+        "total_price_cents": booking.total_price_cents,
+        "currency": booking.currency,
+        "cancelled_at": booking.cancelled_at,
+        "parking_title": parking_space.title if parking_space else "Stellplatz",
+        "vehicle_plate": vehicle.plate if vehicle else "",
+    }
+    if payment is not None:
+        result["payment"] = payment_out(payment)
+    if booking.status == BookingStatus.confirmed and parking_space is not None:
+        result.update(
+            exact_address=parking_space.exact_address,
+            entrance_instructions=parking_space.entrance_instructions,
+            access_code=booking.access_code,
+            parking_pass_token=booking.parking_pass_token,
+        )
+    return result
+
+
+@router.post("/payments/checkout", status_code=status.HTTP_201_CREATED)
+async def create_payment_checkout(
+    data: BookingIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await PaymentService.create_checkout(db, user_id, data)
+
+
+@router.get("/payments/checkout/{session_id}")
+async def payment_checkout_status(
+    session_id: str,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await PaymentService.checkout_status(db, user_id, session_id)
+
+
+@router.get("/payments/bookings/{booking_id}")
+async def payment_booking(
+    booking_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    booking = await db.scalar(
+        select(Booking).where(
+            Booking.id == booking_id,
+            Booking.user_id == user_id,
+        )
+    )
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    parking_space = await db.get(ParkingSpace, booking.parking_space_id)
+    vehicle = await db.get(Vehicle, booking.vehicle_id)
+    payment = await db.scalar(select(Payment).where(Payment.booking_id == booking.id))
+    return _booking_out(booking, parking_space, vehicle, payment)
+
+
+@router.post("/payments/bookings/{booking_id}/cancel")
+async def cancel_paid_booking(
+    booking_id: uuid.UUID,
+    data: CancelIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    booking = await db.scalar(
+        select(Booking)
+        .where(Booking.id == booking_id, Booking.user_id == user_id)
+        .with_for_update()
+    )
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if booking.status in {BookingStatus.cancelled, BookingStatus.completed}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "not_cancellable",
+                "message": "Diese Buchung kann nicht storniert werden.",
+            },
+        )
+
+    payment = await PaymentService.refund_booking(db, booking)
+    booking.status = BookingStatus.cancelled
+    booking.cancelled_at = datetime.now(timezone.utc)
+    booking.cancellation_reason = data.reason
+    booking.access_code = ""
+    booking.parking_pass_token = ""
+    db.add(
+        BookingEvent(
+            booking_id=booking.id,
+            event_type="cancelled",
+            event_metadata={
+                "reason": data.reason,
+                "payment_status": payment.status if payment else "not_found",
+            },
+        )
+    )
+    await db.commit()
+    parking_space = await db.get(ParkingSpace, booking.parking_space_id)
+    vehicle = await db.get(Vehicle, booking.vehicle_id)
+    if payment is not None:
+        await db.refresh(payment)
+    return _booking_out(booking, parking_space, vehicle, payment)
+
+
+@router.post("/payments/webhook", status_code=status.HTTP_204_NO_CONTENT)
+async def stripe_webhook(
+    request: Request,
+    stripe_signature: str = Header(default="", alias="Stripe-Signature"),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    payload = await request.body()
+    await PaymentService.process_webhook(db, payload, stripe_signature)
+
+
+@router.get("/host/finance")
+async def host_finance(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await PaymentService.finance(db, user_id)
+
+
+@router.get("/host/payments/connect/status")
+async def host_connect_status(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await PaymentService.connect_status(db, user_id)
+
+
+@router.post("/host/payments/connect/onboarding")
+async def host_connect_onboarding(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    return await PaymentService.onboarding_link(db, user_id)
+
+
+@router.post("/host/payments/connect/dashboard")
+async def host_connect_dashboard(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    return await PaymentService.dashboard_link(db, user_id)
