@@ -7,9 +7,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
+from app.core.config import settings
 from app.db.session import get_session
-from app.models import Booking, BookingEvent, BookingStatus, ParkingSpace, Payment, Vehicle
+from app.models import (
+    Booking,
+    BookingEvent,
+    BookingStatus,
+    HostPaymentAccount,
+    ParkingSpace,
+    Payment,
+    Vehicle,
+)
 from app.schemas.api import BookingIn, CancelIn
+from app.services.payment_lifecycle import cancel_unpaid_checkout
 from app.services.payments import PaymentService, payment_out
 
 router = APIRouter(prefix="/api")
@@ -54,6 +64,24 @@ async def create_payment_checkout(
     user_id: uuid.UUID = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    parking_space = await db.get(ParkingSpace, data.parking_space_id)
+    if parking_space is None or parking_space.status != "active":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    if settings.payment_mode == "stripe" and parking_space.owner_id is not None:
+        account = await db.get(HostPaymentAccount, parking_space.owner_id)
+        if account is None or not account.charges_enabled or not account.payouts_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "host_payout_not_ready",
+                    "message": (
+                        "Dieser Anbieter hat sein Auszahlungskonto noch nicht "
+                        "vollständig aktiviert."
+                    ),
+                },
+            )
+
     return await PaymentService.create_checkout(db, user_id, data)
 
 
@@ -109,7 +137,12 @@ async def cancel_paid_booking(
             },
         )
 
-    payment = await PaymentService.refund_booking(db, booking)
+    payment = await db.scalar(select(Payment).where(Payment.booking_id == booking.id))
+    if payment is not None and payment.status != "paid":
+        await cancel_unpaid_checkout(payment)
+    else:
+        payment = await PaymentService.refund_booking(db, booking)
+
     booking.status = BookingStatus.cancelled
     booking.cancelled_at = datetime.now(timezone.utc)
     booking.cancellation_reason = data.reason
