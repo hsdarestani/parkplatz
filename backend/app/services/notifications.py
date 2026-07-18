@@ -23,8 +23,20 @@ EVENT_CATEGORIES = {
     "booking_confirmed": "booking_updates",
     "booking_cancelled": "booking_updates",
     "booking_refunded": "booking_updates",
+    "direct_payment_submitted_renter": "booking_updates",
+    "direct_payment_confirmed": "booking_updates",
+    "direct_payment_rejected": "booking_updates",
+    "host_confirmation_timeout_renter": "booking_updates",
+    "manual_refund_pending": "booking_updates",
+    "manual_refund_completed": "booking_updates",
     "host_booking_received": "host_updates",
     "host_booking_cancelled": "host_updates",
+    "direct_payment_submitted_host": "host_updates",
+    "host_confirmation_timeout_host": "host_updates",
+    "manual_refund_required": "host_updates",
+    "pro_plan_requested": "host_updates",
+    "pro_plan_activated": "host_updates",
+    "plan_changed": "host_updates",
     "verification_submitted": "trust_updates",
     "verification_approved": "trust_updates",
     "verification_rejected": "trust_updates",
@@ -121,6 +133,76 @@ def render_email(event_type: str, payload: dict[str, Any]) -> tuple[str, str]:
             f"Buchung {reference} storniert",
             f"Die Buchung für deinen Stellplatz {parking_title} wurde storniert.",
         )
+    if event_type == "direct_payment_submitted_host":
+        return (
+            f"Zahlung für {reference} prüfen",
+            f"Der Mieter hat eine Direktzahlung für {parking_title} eingereicht.\n"
+            f"Betrag: {amount}\nReferenz: {payload.get('payer_reference', '')}\n"
+            f"Bitte bestätige oder lehne die Zahlung bis {payload.get('due_at', '')} ab.",
+        )
+    if event_type == "direct_payment_submitted_renter":
+        return (
+            f"Zahlung für {reference} eingereicht",
+            f"Deine Zahlung für {parking_title} wurde an den Anbieter zur Prüfung gesendet.\n"
+            f"Betrag: {amount}\nDie Buchung wird nach Bestätigung freigeschaltet.",
+        )
+    if event_type == "direct_payment_confirmed":
+        return (
+            f"Zahlung für {reference} bestätigt",
+            f"Der Anbieter hat deine Zahlung für {parking_title} bestätigt. "
+            "Adresse und Parking Pass sind jetzt verfügbar.",
+        )
+    if event_type == "direct_payment_rejected":
+        return (
+            f"Zahlung für {reference} nicht bestätigt",
+            f"Der Anbieter konnte die Zahlung für {parking_title} nicht bestätigen.\n{note}",
+        )
+    if event_type == "host_confirmation_timeout_renter":
+        return (
+            f"Buchung {reference} automatisch beendet",
+            f"Der Anbieter hat die Zahlung für {parking_title} nicht rechtzeitig geprüft. "
+            "Die Reservierung wurde automatisch beendet. Kontaktiere den Support, falls Geld "
+            "überwiesen wurde.",
+        )
+    if event_type == "host_confirmation_timeout_host":
+        return (
+            f"Bestätigungsfrist für {reference} abgelaufen",
+            f"Die Reservierung für {parking_title} wurde beendet, weil keine rechtzeitige "
+            "Zahlungsentscheidung eingegangen ist.",
+        )
+    if event_type == "manual_refund_required":
+        return (
+            f"Rückerstattung für {reference} erforderlich",
+            f"Die Buchung für {parking_title} wurde storniert. Bitte erstatte {amount} direkt "
+            "an den Mieter und trage anschließend die Rückerstattungsreferenz in FREIRAUM ein.",
+        )
+    if event_type == "manual_refund_pending":
+        return (
+            f"Rückerstattung für {reference} angefordert",
+            f"Der Anbieter wurde aufgefordert, {amount} für {parking_title} direkt zu erstatten.",
+        )
+    if event_type == "manual_refund_completed":
+        return (
+            f"Rückerstattung für {reference} bestätigt",
+            f"Der Anbieter hat die Rückerstattung über {amount} als ausgeführt markiert.\n"
+            f"Referenz: {payload.get('refund_reference', '')}",
+        )
+    if event_type == "pro_plan_requested":
+        return (
+            "FREIRAUM Pro angefragt",
+            "Deine Pro-Anfrage wurde gespeichert. Wir melden uns zur Aktivierung und Abrechnung.",
+        )
+    if event_type == "pro_plan_activated":
+        return (
+            "FREIRAUM Pro aktiviert",
+            "Dein Pro-Tarif ist aktiv. Du kannst jetzt mehr Stellplätze veröffentlichen und "
+            "profitierst von einer schnelleren Zahlungsbearbeitung.",
+        )
+    if event_type == "plan_changed":
+        return (
+            "FREIRAUM Tarif aktualisiert",
+            f"Dein Tarif wurde auf {payload.get('plan', 'free')} gesetzt.",
+        )
     if event_type == "password_reset_requested":
         return (
             "FREIRAUM Passwort zurücksetzen",
@@ -167,6 +249,7 @@ def _send_smtp(record: NotificationOutbox) -> None:
     sender_name = os.getenv("SMTP_FROM_NAME", "FREIRAUM")
     username = os.getenv("SMTP_USERNAME", "")
     password = os.getenv("SMTP_PASSWORD", "")
+    use_ssl = os.getenv("SMTP_SSL", "false").lower() in {"1", "true", "yes"}
     use_starttls = os.getenv("SMTP_STARTTLS", "true").lower() in {"1", "true", "yes"}
 
     subject, body = render_email(record.event_type, record.payload)
@@ -176,8 +259,9 @@ def _send_smtp(record: NotificationOutbox) -> None:
     message["To"] = record.recipient
     message.set_content(body)
 
-    with smtplib.SMTP(host, port, timeout=20) as client:
-        if use_starttls:
+    client_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+    with client_class(host, port, timeout=20) as client:
+        if use_starttls and not use_ssl:
             client.starttls()
         if username:
             client.login(username, password)
@@ -185,7 +269,8 @@ def _send_smtp(record: NotificationOutbox) -> None:
 
 
 async def deliver_queued(db: AsyncSession, limit: int = 25) -> int:
-    if os.getenv("EMAIL_MODE", "outbox") != "smtp" or not os.getenv("SMTP_HOST"):
+    mode = os.getenv("EMAIL_MODE", "auto").lower()
+    if mode not in {"auto", "smtp"} or not os.getenv("SMTP_HOST"):
         return 0
 
     records = list(
