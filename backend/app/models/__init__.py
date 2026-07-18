@@ -1,5 +1,10 @@
 from . import audit_events, booking_notification_events
-from .account import AdminAuditLog, NotificationPreference, PasswordResetToken
+from .account import (
+    AdminAuditLog,
+    HostSubscription,
+    NotificationPreference,
+    PasswordResetToken,
+)
 from .base import (
     AvailabilityBlock,
     AvailabilityRule,
@@ -27,6 +32,7 @@ __all__ = [
     "BookingStatus",
     "HostDirectPaymentSettings",
     "HostPaymentAccount",
+    "HostSubscription",
     "NotificationOutbox",
     "NotificationPreference",
     "ParkingSpace",
