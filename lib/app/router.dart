@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
 import '../features/booking/presentation/booking_screens.dart';
+import '../features/booking/presentation/my_bookings_screen.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
 import '../features/host/presentation/host_dashboard_screen.dart';
 import '../features/host/presentation/host_listing_wizard.dart';
@@ -66,7 +67,7 @@ GoRouter createRouter() => GoRouter(
         GoRoute(
           path: '/bookings',
           builder: (context, state) =>
-              _protected('/bookings', const BookingsScreen()),
+              _protected('/bookings', const MyBookingsScreen()),
         ),
         GoRoute(
           path: '/bookings/:id/pass',
