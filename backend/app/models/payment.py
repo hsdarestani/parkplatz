@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -28,6 +28,7 @@ class Payment(Timestamp, Base):
     __table_args__ = (
         UniqueConstraint("booking_id"),
         Index("ix_payments_host_status", "host_user_id", "status"),
+        Index("ix_payments_host_response_due", "status", "host_response_due_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -64,13 +65,28 @@ class Payment(Timestamp, Base):
     )
     charge_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     refund_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    refund_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     destination_account_id: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )
     payment_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
     payer_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    receipt_storage_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    receipt_original_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    receipt_mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    receipt_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    receipt_access_token: Mapped[str | None] = mapped_column(
+        String(128),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
     expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    host_response_due_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
