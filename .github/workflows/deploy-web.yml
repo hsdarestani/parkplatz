@@ -32,7 +32,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://freiraum:freiraum@localhost:5432/freiraum
       JWT_SECRET: ci-only-secret-not-used-in-production
-      PAYMENT_MODE: beta
+      PAYMENT_MODE: direct
       PUBLIC_APP_URL: http://localhost:8080
     steps:
       - uses: actions/checkout@v5
@@ -81,7 +81,7 @@ jobs:
         run: flutter test
 
       - name: Build Flutter Web without PWA service-worker cache
-        run: flutter build web --release --base-href / --pwa-strategy=none --dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true
+        run: flutter build web --release --base-href / --pwa-strategy=none --dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
 
       - name: Version production entry assets and direct routes
         run: |
@@ -128,10 +128,13 @@ jobs:
           for route in (
               'register',
               'login',
+              'forgot-password',
+              'reset-password',
               'bookings',
               'discover',
               'search',
               'profile',
+              'account/security',
               'vehicles',
               'host',
               'host/new',
@@ -150,7 +153,14 @@ jobs:
               (route_dir / 'index.html').write_text(index_text)
 
           (build_dir / 'build-version.json').write_text(
-              json.dumps({'commit': sha}, separators=(',', ':')) + '\n'
+              json.dumps(
+                  {
+                      'commit': sha,
+                      'version': '0.9.0',
+                      'channel': 'public-beta',
+                  },
+                  separators=(',', ':'),
+              ) + '\n'
           )
 
           if sha not in index.read_text():
@@ -159,6 +169,9 @@ jobs:
               raise SystemExit('Versioned bootstrap file missing')
           if not (build_dir / versioned_main_name).is_file():
               raise SystemExit('Versioned main bundle missing')
+          for required in ('manifest.json', 'robots.txt', 'sitemap.xml'):
+              if not (build_dir / required).is_file():
+                  raise SystemExit(f'Release asset missing: {required}')
           PY
 
       - name: Upload build artifact
@@ -203,7 +216,7 @@ jobs:
           ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
             'cd /srv/parkplatz && ./ops/deploy-backend.sh'
 
-      - name: Verify deployment, routes, and production API
+      - name: Verify deployment, routes, release assets, and production API
         run: |
           set -euo pipefail
 
@@ -211,7 +224,7 @@ jobs:
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
             | grep --fixed-strings "${GITHUB_SHA}"
 
-          for route in '' register/ login/ bookings/ discover/ search/ profile/ vehicles/ host/ host/new/ host/finance/ payment-return/ trust/ trust/verification/ trust/support/ admin/trust/ legal/privacy/ legal/terms/ legal/imprint/; do
+          for route in '' register/ login/ forgot-password/ reset-password/ bookings/ discover/ search/ profile/ account/security/ vehicles/ host/ host/new/ host/finance/ payment-return/ trust/ trust/verification/ trust/support/ admin/trust/ legal/privacy/ legal/terms/ legal/imprint/; do
             headers="$(mktemp)"
             body="$(mktemp)"
             curl --fail --location --show-error --silent --retry 10 --retry-delay 3 \
@@ -221,6 +234,12 @@ jobs:
             grep --ignore-case --extended-regexp '^content-type: text/html([;[:space:]]|$)' "$headers"
             grep --fixed-strings "${GITHUB_SHA}" "$body"
             rm -f "$headers" "$body"
+          done
+
+          for asset in manifest.json robots.txt sitemap.xml; do
+            curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+              "https://parkplatz.smarbiz.sbs/${asset}?deploy=${GITHUB_SHA}" \
+              > /dev/null
           done
 
           curl --fail --show-error --silent --retry 10 --retry-delay 3 \
@@ -243,4 +262,4 @@ jobs:
           print(f'Production API ready with {len(spaces)} parking spaces.')
           PY
 
-          echo "Deployment, direct routes, and production API verified."
+          echo "Public beta deployment, routes, release assets, and production API verified."
