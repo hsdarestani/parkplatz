@@ -44,27 +44,16 @@ for attempt in $(seq 1 30); do
   spaces_ok=false
 
   if curl --fail --silent --show-error --max-time 5 "$HEALTH_URL" > /tmp/freiraum-health.json 2>/tmp/freiraum-health.err; then
-    if python - <<'PY'
-import json
-from pathlib import Path
-
-payload = json.loads(Path('/tmp/freiraum-health.json').read_text())
-raise SystemExit(0 if payload.get('status') == 'ok' and payload.get('database') == 'connected' else 1)
-PY
-    then
+    if grep --quiet --extended-regexp '"status"[[:space:]]*:[[:space:]]*"ok"' /tmp/freiraum-health.json \
+      && grep --quiet --extended-regexp '"database"[[:space:]]*:[[:space:]]*"connected"' /tmp/freiraum-health.json; then
       health_ok=true
     fi
   fi
 
-  if [[ "$health_ok" == true ]] && curl --fail --silent --show-error --max-time 5 "$SPACES_URL" > /tmp/freiraum-spaces.json 2>/tmp/freiraum-spaces.err; then
-    if python - <<'PY'
-import json
-from pathlib import Path
-
-payload = json.loads(Path('/tmp/freiraum-spaces.json').read_text())
-raise SystemExit(0 if isinstance(payload, list) else 1)
-PY
-    then
+  if [[ "$health_ok" == true ]] \
+    && curl --fail --silent --show-error --max-time 5 "$SPACES_URL" > /tmp/freiraum-spaces.json 2>/tmp/freiraum-spaces.err; then
+    first_character="$(tr -d '[:space:]' < /tmp/freiraum-spaces.json | cut -c1)"
+    if [[ "$first_character" == "[" ]]; then
       spaces_ok=true
     fi
   fi
@@ -94,6 +83,14 @@ done
 echo "API data routes did not become ready before the deployment timeout." >&2
 cat /tmp/freiraum-health.err >&2 || true
 cat /tmp/freiraum-spaces.err >&2 || true
+if [[ -f /tmp/freiraum-health.json ]]; then
+  echo "Last health response:" >&2
+  cat /tmp/freiraum-health.json >&2
+fi
+if [[ -f /tmp/freiraum-spaces.json ]]; then
+  echo "Last parking-spaces response:" >&2
+  cat /tmp/freiraum-spaces.json >&2
+fi
 docker compose -f "$COMPOSE_FILE" ps >&2
 docker compose -f "$COMPOSE_FILE" logs --no-color --tail=200 api >&2
 exit 1
