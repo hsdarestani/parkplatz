@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import func, select
 
 from app.api.account_routes import router as account_router
 from app.api.host_schedule_routes import router as host_schedule_router
@@ -8,6 +9,10 @@ from app.api.payment_routes import router as payment_router
 from app.api.routes import router
 from app.api.trust_routes import router as trust_router
 from app.core.config import settings
+from app.core.security import decode
+from app.db.session import Session
+from app.models import ParkingSpace
+from app.services.subscriptions import plan_limits, subscription_for
 
 app = FastAPI(title="FREIRAUM API", version="0.1.0")
 app.include_router(router)
@@ -19,7 +24,7 @@ app.include_router(account_router)
 
 
 @app.middleware("http")
-async def require_payment_checkout(request: Request, call_next):
+async def protect_launch_flows(request: Request, call_next):
     protected_modes = {"stripe", "direct"}
     if (
         settings.payment_mode in protected_modes
@@ -35,6 +40,39 @@ async def require_payment_checkout(request: Request, call_next):
                 }
             },
         )
+
+    if request.method == "POST" and request.url.path == "/api/host/parking-spaces":
+        authorization = request.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            try:
+                user_id = decode(authorization.split(" ", 1)[1])
+                async with Session() as db:
+                    subscription = await subscription_for(db, user_id)
+                    assert subscription is not None
+                    limit = plan_limits(subscription.plan)["listing_limit"]
+                    count = await db.scalar(
+                        select(func.count(ParkingSpace.id)).where(
+                            ParkingSpace.owner_id == user_id,
+                            ParkingSpace.status != "archived",
+                        )
+                    )
+                    await db.commit()
+                    if (count or 0) >= limit:
+                        return JSONResponse(
+                            status_code=409,
+                            content={
+                                "detail": {
+                                    "code": "plan_listing_limit",
+                                    "message": (
+                                        "Dein aktueller Tarif erlaubt keine weiteren "
+                                        "Stellplätze. Wechsle zu FREIRAUM Pro."
+                                    ),
+                                }
+                            },
+                        )
+            except Exception:
+                pass
+
     return await call_next(request)
 
 
