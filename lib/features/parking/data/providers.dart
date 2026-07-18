@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../booking/data/owner_aware_availability_repository.dart';
 import '../../booking/data/repositories.dart';
+import '../../payment/data/payment_aware_booking_repository.dart';
 import '../../../shared/models/models.dart';
 import '../../search/presentation/search_controller.dart';
 import 'demo_parking_repository.dart';
@@ -60,7 +61,10 @@ final bookingRepositoryProvider = Provider<BookingRepository>((ref) {
   final mode = ref.watch(appModeProvider);
   return _forMode(
     mode,
-    () => ApiBookingRepository(ref.watch(apiClientProvider)),
+    () {
+      final api = ref.watch(apiClientProvider);
+      return PaymentAwareBookingRepository(ApiBookingRepository(api), api);
+    },
     LocalBetaBookingRepository.new,
   );
 });
