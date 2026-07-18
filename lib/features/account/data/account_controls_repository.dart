@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../parking/data/providers.dart';
+import '../../booking/data/repositories.dart';
 
 class NotificationPreferences {
   const NotificationPreferences({
