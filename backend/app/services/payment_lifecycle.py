@@ -8,7 +8,15 @@ from app.services.payments import StripeGateway
 
 
 async def cancel_unpaid_checkout(payment: Payment) -> None:
-    if payment.status not in {"pending", "checkout_created", "failed", "expired"}:
+    if payment.status not in {
+        "pending",
+        "checkout_created",
+        "failed",
+        "expired",
+        "awaiting_payment",
+        "awaiting_host_confirmation",
+        "rejected",
+    }:
         return
 
     if (
