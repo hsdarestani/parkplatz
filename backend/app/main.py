@@ -18,8 +18,9 @@ app.include_router(account_router)
 
 @app.middleware("http")
 async def require_payment_checkout(request: Request, call_next):
+    protected_modes = {"stripe", "direct"}
     if (
-        settings.payment_mode == "stripe"
+        settings.payment_mode in protected_modes
         and request.method == "POST"
         and request.url.path == "/api/bookings"
     ):
@@ -28,7 +29,7 @@ async def require_payment_checkout(request: Request, call_next):
             content={
                 "detail": {
                     "code": "payment_required",
-                    "message": "Bitte schließe die Buchung über die sichere Zahlung ab.",
+                    "message": "Bitte verwende den vorgesehenen Buchungsablauf.",
                 }
             },
         )
