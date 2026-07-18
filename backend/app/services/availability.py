@@ -104,7 +104,15 @@ async def evaluate_availability(
                 Booking.status == BookingStatus.confirmed,
                 and_(
                     Booking.status == BookingStatus.pending,
-                    Payment.status.in_(["pending", "checkout_created", "paid"]),
+                    Payment.status.in_(
+                        [
+                            "pending",
+                            "checkout_created",
+                            "awaiting_payment",
+                            "awaiting_host_confirmation",
+                            "paid",
+                        ]
+                    ),
                     Payment.expires_at > now,
                 ),
             ),
