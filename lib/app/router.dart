@@ -9,9 +9,9 @@ import '../features/booking/presentation/premium_checkout.dart';
 import '../features/booking/presentation/premium_confirmation_pass.dart';
 import '../features/booking/presentation/premium_parking_detail.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
-import '../features/host/presentation/host_dashboard_screen.dart';
 import '../features/host/presentation/host_listing_wizard.dart';
 import '../features/host/presentation/host_manage_screen.dart';
+import '../features/host/presentation/host_operations_dashboard.dart';
 import '../features/launch/launch_screen.dart';
 import '../shared/widgets/authenticated_route_guard.dart';
 
@@ -96,7 +96,7 @@ GoRouter createRouter() => GoRouter(
         GoRoute(
           path: '/host',
           builder: (context, state) =>
-              _protected('/host', const HostDashboardScreen()),
+              _protected('/host', const HostOperationsDashboard()),
         ),
         GoRoute(
           path: '/host/new',
