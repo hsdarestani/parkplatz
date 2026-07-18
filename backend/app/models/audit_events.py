@@ -1,4 +1,4 @@
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 
 from .account import AdminAuditLog
 from .trust import SafetyReport, VerificationRequest
@@ -6,7 +6,11 @@ from .trust import SafetyReport, VerificationRequest
 
 @event.listens_for(VerificationRequest, "after_update")
 def audit_verification_review(_mapper, connection, target: VerificationRequest) -> None:
-    if target.reviewed_by is None or target.reviewed_at is None:
+    if (
+        target.reviewed_by is None
+        or target.reviewed_at is None
+        or not inspect(target).attrs.status.history.has_changes()
+    ):
         return
     connection.execute(
         AdminAuditLog.__table__.insert().values(
@@ -24,7 +28,11 @@ def audit_verification_review(_mapper, connection, target: VerificationRequest) 
 
 @event.listens_for(SafetyReport, "after_update")
 def audit_report_review(_mapper, connection, target: SafetyReport) -> None:
-    if target.reviewed_by is None or target.reviewed_at is None:
+    if (
+        target.reviewed_by is None
+        or target.reviewed_at is None
+        or not inspect(target).attrs.status.history.has_changes()
+    ):
         return
     connection.execute(
         AdminAuditLog.__table__.insert().values(
