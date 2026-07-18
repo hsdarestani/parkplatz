@@ -1,4 +1,4 @@
-from . import audit_events
+from . import audit_events, booking_notification_events
 from .account import AdminAuditLog, NotificationPreference, PasswordResetToken
 from .base import (
     AvailabilityBlock,
@@ -38,4 +38,5 @@ __all__ = [
     "Vehicle",
     "VerificationRequest",
     "audit_events",
+    "booking_notification_events",
 ]
