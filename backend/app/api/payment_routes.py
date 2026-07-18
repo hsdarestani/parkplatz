@@ -19,10 +19,28 @@ from app.models import (
     Vehicle,
 )
 from app.schemas.api import BookingIn, CancelIn
+from app.schemas.direct_payment import (
+    DirectPaymentDecisionIn,
+    DirectPaymentReferenceIn,
+    DirectPaymentSettingsIn,
+)
+from app.services.direct_payments import DirectPaymentService
 from app.services.payment_lifecycle import cancel_unpaid_checkout
 from app.services.payments import PaymentService, payment_out
 
 router = APIRouter(prefix="/api")
+
+
+def _payment_out(payment: Payment) -> dict[str, Any]:
+    result = payment_out(payment)
+    result.update(
+        payment_method=payment.payment_method,
+        payer_reference=payment.payer_reference,
+        submitted_at=payment.submitted_at,
+        host_confirmed_at=payment.host_confirmed_at,
+        rejected_at=payment.rejected_at,
+    )
+    return result
 
 
 def _booking_out(
@@ -47,7 +65,7 @@ def _booking_out(
         "vehicle_plate": vehicle.plate if vehicle else "",
     }
     if payment is not None:
-        result["payment"] = payment_out(payment)
+        result["payment"] = _payment_out(payment)
     if booking.status == BookingStatus.confirmed and parking_space is not None:
         result.update(
             exact_address=parking_space.exact_address,
@@ -67,6 +85,9 @@ async def create_payment_checkout(
     parking_space = await db.get(ParkingSpace, data.parking_space_id)
     if parking_space is None or parking_space.status != "active":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    if settings.payment_mode == "direct":
+        return await DirectPaymentService.create_checkout(db, user_id, data)
 
     if settings.payment_mode == "stripe" and parking_space.owner_id is not None:
         account = await db.get(HostPaymentAccount, parking_space.owner_id)
@@ -92,6 +113,21 @@ async def payment_checkout_status(
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     return await PaymentService.checkout_status(db, user_id, session_id)
+
+
+@router.post("/payments/bookings/{booking_id}/reference")
+async def submit_direct_payment_reference(
+    booking_id: uuid.UUID,
+    data: DirectPaymentReferenceIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await DirectPaymentService.submit_reference(
+        db,
+        user_id,
+        booking_id,
+        data,
+    )
 
 
 @router.get("/payments/bookings/{booking_id}")
@@ -138,7 +174,15 @@ async def cancel_paid_booking(
         )
 
     payment = await db.scalar(select(Payment).where(Payment.booking_id == booking.id))
-    if payment is not None and payment.status != "paid":
+    if payment is not None and payment.provider == "direct":
+        if payment.status == "paid":
+            payment.status = "refund_required"
+            payment.failure_message = (
+                "Der Anbieter muss die direkte Zahlung manuell erstatten."
+            )
+        else:
+            await cancel_unpaid_checkout(payment)
+    elif payment is not None and payment.status != "paid":
         await cancel_unpaid_checkout(payment)
     else:
         payment = await PaymentService.refund_booking(db, booking)
@@ -182,6 +226,41 @@ async def host_finance(
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     return await PaymentService.finance(db, user_id)
+
+
+@router.get("/host/payments/direct/settings")
+async def host_direct_payment_settings(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await DirectPaymentService.settings(db, user_id)
+
+
+@router.post("/host/payments/direct/settings")
+async def save_host_direct_payment_settings(
+    data: DirectPaymentSettingsIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await DirectPaymentService.save_settings(db, user_id, data)
+
+
+@router.get("/host/payments/direct/pending")
+async def host_pending_direct_payments(
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[dict[str, Any]]:
+    return await DirectPaymentService.pending_for_host(db, user_id)
+
+
+@router.post("/host/payments/direct/{payment_id}/decision")
+async def decide_direct_payment(
+    payment_id: uuid.UUID,
+    data: DirectPaymentDecisionIn,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    return await DirectPaymentService.decide(db, user_id, payment_id, data)
 
 
 @router.get("/host/payments/connect/status")
