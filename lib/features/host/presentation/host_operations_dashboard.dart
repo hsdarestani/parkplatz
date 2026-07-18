@@ -39,6 +39,11 @@ class _HostOperationsDashboardState
         activePath: '/host',
         actions: [
           OutlinedButton.icon(
+            onPressed: () => context.go('/trust'),
+            icon: const Icon(Icons.verified_user_outlined),
+            label: const Text('Prüfung'),
+          ),
+          OutlinedButton.icon(
             onPressed: () => context.go('/host/finance'),
             icon: const Icon(Icons.account_balance_wallet_outlined),
             label: const Text('Finanzen'),
