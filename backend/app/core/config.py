@@ -9,7 +9,20 @@ class Settings(BaseSettings):
     environment: str = "development"
     version: str = "0.1.0"
 
+    payment_mode: str = "beta"
+    public_app_url: str = "http://localhost:8080"
+    platform_fee_basis_points: int = 1500
+    payment_hold_minutes: int = 30
+
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_country: str = "DE"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def stripe_enabled(self) -> bool:
+        return self.payment_mode == "stripe" and bool(self.stripe_secret_key)
 
 
 settings = Settings()
