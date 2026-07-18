@@ -13,6 +13,8 @@ class DirectPaymentSettingsIn(BaseModel):
 
     @model_validator(mode="after")
     def validate_destination(self) -> "DirectPaymentSettingsIn":
+        if not self.enabled:
+            return self
         if self.method in {"paypal", "revolut"}:
             if not self.payment_url or not self.payment_url.startswith("https://"):
                 raise ValueError("payment_url must be a secure https URL")
