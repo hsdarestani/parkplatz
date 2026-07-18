@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import NotificationOutbox, SafetyReport, VerificationRequest
+from app.services.notifications import queue_email
 
 
 VERIFICATION_FINAL_STATUSES = {"approved", "rejected"}
@@ -61,18 +62,15 @@ async def queue_notification(
     event_type: str,
     deduplication_key: str,
     payload: dict[str, Any],
-) -> NotificationOutbox:
-    record = NotificationOutbox(
+) -> NotificationOutbox | None:
+    return await queue_email(
+        db,
         user_id=user_id,
-        event_type=event_type,
-        channel="email",
         recipient=recipient,
-        payload=payload,
-        status="queued",
+        event_type=event_type,
         deduplication_key=deduplication_key,
+        payload=payload,
     )
-    db.add(record)
-    return record
 
 
 def mark_reviewed(record: VerificationRequest | SafetyReport, reviewer_id: uuid.UUID) -> None:
