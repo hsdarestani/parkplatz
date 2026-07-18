@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import Booking, BookingEvent, BookingStatus, ParkingSpace, Payment, User, Vehicle
+from app.models import Booking, BookingEvent, ParkingSpace, Payment, User, Vehicle
 from app.schemas.direct_payment import DirectPaymentDecisionIn, DirectPaymentReferenceIn
 from app.schemas.launch_operations import ManualRefundIn
 from app.services.booking import BookingService
