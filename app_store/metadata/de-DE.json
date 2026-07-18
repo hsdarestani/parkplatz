@@ -1,0 +1,43 @@
+{
+  "app_name": "FREIRAUM Parkplatz",
+  "subtitle": "Parkplätze einfach teilen",
+  "bundle_id": "de.freiraum.parking",
+  "sku": "freiraum-ios-001",
+  "primary_language": "German",
+  "primary_category": "Navigation",
+  "secondary_category": "Travel",
+  "version": "0.9.0",
+  "copyright": "2026 A+ Solution GmbH",
+  "promotional_text": "Private Stellplätze finden, direkt beim Anbieter bezahlen und nach Bestätigung entspannt parken.",
+  "description": "FREIRAUM verbindet Fahrerinnen und Fahrer mit privaten Parkplatzanbietern.\n\nSo funktioniert es:\n• Stellplätze auf der Karte entdecken\n• Zeitraum und Fahrzeug auswählen\n• Verfügbarkeit und Fahrzeugmaße prüfen\n• Direkt per PayPal, Revolut oder SEPA an den Anbieter zahlen\n• Zahlungsreferenz oder Beleg einreichen\n• Nach Bestätigung Adresse, Einfahrthinweise und Parking Pass erhalten\n\nFür Anbieter:\n• Stellplatz, Preis und Verfügbarkeit verwalten\n• Zahlungen prüfen und Buchungen bestätigen\n• Rückerstattungen transparent dokumentieren\n• Mit dem Free-Plan starten und Pro während der Public Beta anfragen\n\nFREIRAUM verarbeitet keine Kundengelder. Zahlungen und Rückerstattungen erfolgen direkt zwischen Fahrer und Parkplatzanbieter.",
+  "keywords": "Parkplatz,Parken,Stellplatz,Frankfurt,Parkplatzsuche,Parking,Garage,Auto",
+  "support_url": "https://aplus-solution.de/",
+  "marketing_url": "https://parkplatz.smarbiz.sbs/",
+  "privacy_policy_url": "https://parkplatz.smarbiz.sbs/legal/privacy/",
+  "review_notes": "FREIRAUM vermittelt physische Parkplatzleistungen, die außerhalb der App genutzt werden. Zahlungen erfolgen direkt vom Fahrer an den Parkplatzanbieter über PayPal, Revolut oder SEPA; es werden keine digitalen Inhalte verkauft und FREIRAUM verwahrt keine Kundengelder. Für die Prüfung stellen wir einen Fahrer- und einen Anbieter-Testaccount mit vorbereiteten Daten bereit. Account deletion: Profil > Sicherheit & Datenschutz > Account löschen. Pro ist während der Public Beta nur ein kostenloser Anfrageprozess und noch kein kostenpflichtiges digitales Abonnement.",
+  "privacy_label_draft": {
+    "linked_to_user": [
+      "Name",
+      "Email Address",
+      "User ID",
+      "Physical Address / Parking Location",
+      "Payment Information such as IBAN or payment handle",
+      "Purchase and Booking History",
+      "User Content including vehicle details, receipts and support messages"
+    ],
+    "purposes": [
+      "App Functionality",
+      "Fraud Prevention, Security and Compliance",
+      "Customer Support"
+    ],
+    "tracking": false
+  },
+  "submission_checklist": [
+    "Add German iPhone screenshots without transparency",
+    "Create and verify dedicated App Review renter and host accounts",
+    "Complete the current age-rating questionnaire",
+    "Publish accurate App Privacy answers",
+    "Confirm privacy policy, support URL and review notes",
+    "Upload a signed Xcode 26 / iOS 26 build through TestFlight before review"
+  ]
+}
