@@ -1,3 +1,4 @@
+from . import audit_events
 from .account import AdminAuditLog, NotificationPreference, PasswordResetToken
 from .base import (
     AvailabilityBlock,
@@ -36,4 +37,5 @@ __all__ = [
     "User",
     "Vehicle",
     "VerificationRequest",
+    "audit_events",
 ]
