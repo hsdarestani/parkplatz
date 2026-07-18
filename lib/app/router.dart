@@ -7,6 +7,10 @@ import '../features/discovery/presentation/discovery_screen.dart';
 import '../features/host/presentation/host_dashboard_screen.dart';
 import '../features/host/presentation/host_listing_wizard.dart';
 import '../features/launch/launch_screen.dart';
+import '../shared/widgets/authenticated_route_guard.dart';
+
+AuthenticatedRouteGuard _protected(String path, Widget child) =>
+    AuthenticatedRouteGuard(returnTo: path, child: child);
 
 GoRouter createRouter() => GoRouter(
       routes: [
@@ -40,38 +44,58 @@ GoRouter createRouter() => GoRouter(
         ),
         GoRoute(
           path: '/checkout/:id',
-          builder: (context, state) =>
+          builder: (context, state) {
+            final path = '/checkout/${state.pathParameters['id']}';
+            return _protected(
+              path,
               CheckoutScreen(id: state.pathParameters['id']!),
+            );
+          },
         ),
         GoRoute(
           path: '/booking/:id/confirmed',
-          builder: (context, state) =>
+          builder: (context, state) {
+            final path = '/booking/${state.pathParameters['id']}/confirmed';
+            return _protected(
+              path,
               ConfirmationScreen(id: state.pathParameters['id']!),
+            );
+          },
         ),
         GoRoute(
           path: '/bookings',
-          builder: (context, state) => const BookingsScreen(),
+          builder: (context, state) =>
+              _protected('/bookings', const BookingsScreen()),
         ),
         GoRoute(
           path: '/bookings/:id/pass',
-          builder: (context, state) =>
+          builder: (context, state) {
+            final path = '/bookings/${state.pathParameters['id']}/pass';
+            return _protected(
+              path,
               ParkingPassScreen(id: state.pathParameters['id']!),
+            );
+          },
         ),
         GoRoute(
           path: '/profile',
-          builder: (context, state) => const ProfileScreen(),
+          builder: (context, state) =>
+              _protected('/profile', const ProfileScreen()),
         ),
         GoRoute(
           path: '/vehicles',
-          builder: (context, state) => const VehiclesScreen(),
+          builder: (context, state) =>
+              _protected('/vehicles', const VehiclesScreen()),
         ),
         GoRoute(
           path: '/host',
-          builder: (context, state) => const HostDashboardScreen(),
+          builder: (context, state) =>
+              _protected('/host', const HostDashboardScreen()),
         ),
         GoRoute(
           path: '/host/new',
-          builder: (context, state) => const HostListingWizardScreen(),
+          builder: (context, state) =>
+              _protected('/host/new', const HostListingWizardScreen()),
         ),
       ],
     );
