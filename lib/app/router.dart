@@ -11,6 +11,7 @@ import '../features/booking/presentation/premium_parking_detail.dart';
 import '../features/discovery/presentation/discovery_screen.dart';
 import '../features/host/presentation/host_dashboard_screen.dart';
 import '../features/host/presentation/host_listing_wizard.dart';
+import '../features/host/presentation/host_manage_screen.dart';
 import '../features/launch/launch_screen.dart';
 import '../shared/widgets/authenticated_route_guard.dart';
 
@@ -101,6 +102,16 @@ GoRouter createRouter() => GoRouter(
           path: '/host/new',
           builder: (context, state) =>
               _protected('/host/new', const HostListingWizardScreen()),
+        ),
+        GoRoute(
+          path: '/host/:id/manage',
+          builder: (context, state) {
+            final path = '/host/${state.pathParameters['id']}/manage';
+            return _protected(
+              path,
+              HostManageScreen(id: state.pathParameters['id']!),
+            );
+          },
         ),
       ],
     );
