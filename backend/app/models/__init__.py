@@ -12,6 +12,7 @@ from .base import (
     Vehicle,
 )
 from .payment import HostPaymentAccount, Payment, PaymentWebhookEvent
+from .trust import NotificationOutbox, SafetyReport, VerificationRequest
 
 __all__ = [
     "AvailabilityBlock",
@@ -21,11 +22,14 @@ __all__ = [
     "BookingEvent",
     "BookingStatus",
     "HostPaymentAccount",
+    "NotificationOutbox",
     "ParkingSpace",
     "ParkingSpaceImage",
     "Payment",
     "PaymentWebhookEvent",
     "RefreshToken",
+    "SafetyReport",
     "User",
     "Vehicle",
+    "VerificationRequest",
 ]
