@@ -15,7 +15,6 @@ from app.db.session import get_session
 from app.models import (
     AdminAuditLog,
     Booking,
-    BookingEvent,
     BookingStatus,
     HostPaymentAccount,
     NotificationOutbox,
