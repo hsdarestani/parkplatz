@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/design_tokens.dart';
 import '../../../shared/models/models.dart';
-import '../../../shared/widgets/freiraum_motion.dart';
 import '../../../shared/widgets/freiraum_scaffold.dart';
 import '../../favorites/data/favorites_repository.dart';
 import '../../host/data/host_repository.dart';
@@ -26,7 +25,13 @@ class PremiumParkingDetailScreen extends ConsumerStatefulWidget {
 
 class _PremiumParkingDetailScreenState
     extends ConsumerState<PremiumParkingDetailScreen> {
-  late Future<bool> ownership = _ownsSpace();
+  late Future<bool> ownership;
+
+  @override
+  void initState() {
+    super.initState();
+    ownership = _ownsSpace();
+  }
 
   Future<bool> _ownsSpace() async {
     final auth = ref.read(authRepositoryProvider);
@@ -38,6 +43,7 @@ class _PremiumParkingDetailScreenState
   @override
   Widget build(BuildContext context) {
     final spaceState = ref.watch(parkingSpaceProvider(widget.id));
+
     return FreiraumScaffold(
       title: 'Stellplatz entdecken',
       subtitle: 'Details, Zeitraum und sichere Buchung.',
@@ -48,101 +54,118 @@ class _PremiumParkingDetailScreenState
           message: 'Stellplatz konnte nicht geladen werden.',
           onRetry: () => ref.invalidate(parkingSpaceProvider(widget.id)),
         ),
-        data: (space) => space == null
-            ? const Center(child: Text('Stellplatz nicht gefunden.'))
-            : FutureBuilder<bool>(
-                future: ownership,
-                builder: (context, snapshot) => _content(
-                  space,
-                  owner: snapshot.data ?? false,
-                  checkingOwner:
-                      snapshot.connectionState != ConnectionState.done,
-                ),
-              ),
+        data: (space) {
+          if (space == null) {
+            return const Center(child: Text('Stellplatz nicht gefunden.'));
+          }
+          return FutureBuilder<bool>(
+            future: ownership,
+            builder: (context, snapshot) => _ParkingDetailBody(
+              space: space,
+              owner: snapshot.data ?? false,
+              checkingOwner: snapshot.connectionState != ConnectionState.done,
+            ),
+          );
+        },
       ),
     );
   }
+}
 
-  Widget _content(
-    ParkingSpace space, {
-    required bool owner,
-    required bool checkingOwner,
-  }) {
+class _ParkingDetailBody extends ConsumerStatefulWidget {
+  const _ParkingDetailBody({
+    required this.space,
+    required this.owner,
+    required this.checkingOwner,
+  });
+
+  final ParkingSpace space;
+  final bool owner;
+  final bool checkingOwner;
+
+  @override
+  ConsumerState<_ParkingDetailBody> createState() => _ParkingDetailBodyState();
+}
+
+class _ParkingDetailBodyState extends ConsumerState<_ParkingDetailBody> {
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 700;
+    final pagePadding = compact ? 14.0 : 24.0;
     final hours = math.max(
       1,
       legacy.selectedEnd.difference(legacy.selectedStart).inHours,
     );
-    final totalCents = (space.hourlyPrice * 100 * hours).round();
-    final favorite = ref.watch(favoritesProvider).contains(space.id);
+    final totalCents = (widget.space.hourlyPrice * 100 * hours).round();
+    final favorite = ref.watch(favoritesProvider).contains(widget.space.id);
 
-    return LayoutBuilder(
-      builder: (context, viewport) {
-        final mobile = viewport.maxWidth < 620;
-        return ListView(
-          padding: EdgeInsets.fromLTRB(
-            mobile ? 14 : 24,
-            mobile ? 14 : 24,
-            mobile ? 14 : 24,
-            32,
-          ),
-          children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1160),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    MotionReveal(
-                      child: ParkingDetailHero(space: space, owner: owner),
-                    ),
-                    SizedBox(height: mobile ? 14 : 22),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final desktop = constraints.maxWidth >= 860;
-                        final details = MotionReveal(
-                          delay: const Duration(milliseconds: 90),
-                          child: _DetailsColumn(space: space),
-                        );
-                        final booking = MotionReveal(
-                          delay: const Duration(milliseconds: 150),
-                          child: _BookingPanel(
-                            space: space,
-                            owner: owner,
-                            checkingOwner: checkingOwner,
-                            totalCents: totalCents,
-                            saved: favorite,
-                            onSaved: () => ref
-                                .read(favoritesProvider.notifier)
-                                .toggle(space.id),
-                            onTimeChanged: () => setState(() {}),
-                          ),
-                        );
-                        if (!desktop) {
-                          return Column(
-                            children: [
-                              details,
-                              const SizedBox(height: 14),
-                              booking,
-                            ],
-                          );
-                        }
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 6, child: details),
-                            const SizedBox(width: 22),
-                            Expanded(flex: 4, child: booking),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
+    Future<void> toggleFavorite() async {
+      await ref.read(favoritesProvider.notifier).toggle(widget.space.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              favorite ? 'Favorit entfernt.' : 'Stellplatz gespeichert.',
             ),
-          ],
+          ),
         );
-      },
+    }
+
+    final details = _DetailsColumn(space: widget.space);
+    final booking = _BookingPanel(
+      space: widget.space,
+      owner: widget.owner,
+      checkingOwner: widget.checkingOwner,
+      totalCents: totalCents,
+      favorite: favorite,
+      onFavorite: toggleFavorite,
+      onTimeChanged: () => setState(() {}),
+    );
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        pagePadding,
+        pagePadding,
+        pagePadding,
+        pagePadding + MediaQuery.paddingOf(context).bottom + (compact ? 88 : 24),
+      ),
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1160),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ParkingDetailHero(space: widget.space, owner: widget.owner),
+                SizedBox(height: compact ? 14 : 22),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth < 860) {
+                      return Column(
+                        children: [
+                          details,
+                          const SizedBox(height: 16),
+                          booking,
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 6, child: details),
+                        const SizedBox(width: 22),
+                        Expanded(flex: 4, child: booking),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -160,155 +183,187 @@ class ParkingDetailHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 620;
-          final veryCompact = constraints.maxWidth < 390;
-          final content = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _DarkPill(
-                    icon: owner
-                        ? Icons.home_work_outlined
-                        : Icons.bolt_outlined,
-                    text: owner
-                        ? 'Dein Stellplatz'
-                        : space.instant
-                            ? 'Sofort buchbar'
-                            : 'Anfrage',
-                  ),
-                  _DarkPill(
-                    icon: space.verified
-                        ? Icons.verified_outlined
-                        : Icons.shield_outlined,
-                    text: space.verified
-                        ? 'Verifiziert'
-                        : 'Noch nicht verifiziert',
-                  ),
-                ],
-              ),
-              SizedBox(height: compact ? 16 : 18),
-              Text(
-                space.title,
-                maxLines: compact ? 3 : 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                      fontSize: veryCompact
-                          ? 29
-                          : compact
-                              ? 34
-                              : 44,
-                      height: 1.03,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${space.district} · nahe ${space.landmark}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: compact ? 15 : 17,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: compact ? 18 : 22),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _HeroMetric(
-                    icon: Icons.directions_walk,
-                    value: '${space.walkingMinutes} Min.',
-                    label: 'zu Fuß',
-                    compact: compact,
-                  ),
-                  _HeroMetric(
-                    icon: Icons.star_rounded,
-                    value: space.rating.toStringAsFixed(1),
-                    label: '${space.reviewCount} Bewertungen',
-                    compact: compact,
-                  ),
-                  _HeroMetric(
-                    icon: Icons.euro,
-                    value: bookingMoney(
-                      (space.hourlyPrice * 100).round(),
-                    ),
-                    label: 'pro Stunde',
-                    compact: compact,
-                  ),
-                ],
-              ),
-            ],
+          final compact = constraints.maxWidth < 700;
+          final veryNarrow = constraints.maxWidth < 390;
+          final content = _HeroContent(
+            space: space,
+            owner: owner,
+            compact: compact,
+            veryNarrow: veryNarrow,
           );
 
-          return Container(
-            constraints: BoxConstraints(minHeight: compact ? 0 : 280),
-            padding: EdgeInsets.all(compact ? 20 : 30),
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0A1828), T.inkSoft, Color(0xFF12354A)],
-              ),
-              borderRadius: BorderRadius.circular(
-                compact ? 28 : T.radiusSpacious,
-              ),
-              boxShadow: T.shadowLarge,
+          final decoration = BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF0A1828), T.inkSoft, Color(0xFF12354A)],
             ),
+            borderRadius: BorderRadius.circular(
+              compact ? 26 : T.radiusSpacious,
+            ),
+            boxShadow: T.shadowLarge,
+          );
+
+          if (compact) {
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: decoration,
+              child: content,
+            );
+          }
+
+          return Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 280),
+            padding: const EdgeInsets.all(30),
+            clipBehavior: Clip.hardEdge,
+            decoration: decoration,
             child: Stack(
+              fit: StackFit.expand,
               children: [
                 Positioned(
-                  right: compact ? -70 : -20,
-                  top: compact ? -80 : -40,
+                  right: -20,
+                  top: -40,
                   child: Container(
-                    width: compact ? 190 : 220,
-                    height: compact ? 190 : 220,
+                    width: 220,
+                    height: 220,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: T.mint.withOpacity(.08),
+                      color: T.mint.withOpacity(.07),
                     ),
                   ),
                 ),
-                if (compact)
-                  content
-                else
-                  Row(
-                    children: [
-                      Expanded(child: content),
-                      const SizedBox(width: 24),
-                      Hero(
-                        tag: 'parking-${space.id}',
-                        child: Container(
-                          width: 210,
-                          height: 210,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(.08),
-                            borderRadius: BorderRadius.circular(48),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(.11),
-                            ),
-                          ),
-                          child: Icon(
-                            space.covered
-                                ? Icons.garage_rounded
-                                : Icons.local_parking_rounded,
-                            size: 112,
-                            color: T.mint,
-                          ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: content),
+                    const SizedBox(width: 24),
+                    Container(
+                      width: 210,
+                      height: 210,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.08),
+                        borderRadius: BorderRadius.circular(48),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(.11),
                         ),
                       ),
-                    ],
-                  ),
+                      child: Icon(
+                        space.covered
+                            ? Icons.garage_rounded
+                            : Icons.local_parking_rounded,
+                        size: 112,
+                        color: T.mint,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           );
         },
+      );
+}
+
+class _HeroContent extends StatelessWidget {
+  const _HeroContent({
+    required this.space,
+    required this.owner,
+    required this.compact,
+    required this.veryNarrow,
+  });
+
+  final ParkingSpace space;
+  final bool owner;
+  final bool compact;
+  final bool veryNarrow;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _DarkPill(
+                  icon: owner ? Icons.home_work_outlined : Icons.bolt_outlined,
+                  text: owner
+                      ? 'Dein Stellplatz'
+                      : space.instant
+                          ? 'Sofort buchbar'
+                          : 'Anfrage',
+                ),
+                _DarkPill(
+                  icon: space.verified
+                      ? Icons.verified_outlined
+                      : Icons.shield_outlined,
+                  text: space.verified
+                      ? 'Verifiziert'
+                      : 'Noch nicht verifiziert',
+                ),
+              ],
+            ),
+            SizedBox(height: compact ? 16 : 20),
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                space.title,
+                maxLines: compact ? 3 : 2,
+                softWrap: true,
+                overflow: TextOverflow.ellipsis,
+                textWidthBasis: TextWidthBasis.parent,
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontSize: compact ? (veryNarrow ? 28 : 32) : 44,
+                      height: 1.04,
+                      letterSpacing: -.8,
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${space.district} · nahe ${space.landmark}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: compact ? 14 : 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: compact ? 16 : 22),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _HeroMetric(
+                  icon: Icons.directions_walk,
+                  value: '${space.walkingMinutes} Min.',
+                  label: 'zu Fuß',
+                  compact: compact,
+                ),
+                _HeroMetric(
+                  icon: Icons.star_rounded,
+                  value: space.rating.toStringAsFixed(1),
+                  label: '${space.reviewCount} Bewertungen',
+                  compact: compact,
+                ),
+                _HeroMetric(
+                  icon: Icons.euro,
+                  value: bookingMoney((space.hourlyPrice * 100).round()),
+                  label: 'pro Stunde',
+                  compact: compact,
+                ),
+              ],
+            ),
+          ],
+        ),
       );
 }
 
@@ -332,7 +387,7 @@ class _DetailsColumn extends StatelessWidget {
                 const SizedBox(height: 18),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final itemWidth = constraints.maxWidth < 560
+                    final tileWidth = constraints.maxWidth < 540
                         ? constraints.maxWidth
                         : (constraints.maxWidth - 12) / 2;
                     return Wrap(
@@ -340,25 +395,25 @@ class _DetailsColumn extends StatelessWidget {
                       runSpacing: 12,
                       children: [
                         _FeatureTile(
-                          width: itemWidth,
+                          width: tileWidth,
                           icon: Icons.straighten_outlined,
                           title: 'Fahrzeugmaße',
                           value: space.dimensions(),
                         ),
                         _FeatureTile(
-                          width: itemWidth,
+                          width: tileWidth,
                           icon: Icons.meeting_room_outlined,
                           title: 'Zufahrt',
                           value: space.accessLabel(),
                         ),
                         _FeatureTile(
-                          width: itemWidth,
+                          width: tileWidth,
                           icon: Icons.roofing_outlined,
                           title: 'Schutz',
                           value: space.covered ? 'Überdacht' : 'Freifläche',
                         ),
                         _FeatureTile(
-                          width: itemWidth,
+                          width: tileWidth,
                           icon: Icons.ev_station_outlined,
                           title: 'E-Mobilität',
                           value: space.ev ? 'Lademöglichkeit' : 'Ohne Ladepunkt',
@@ -370,7 +425,7 @@ class _DetailsColumn extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           BookingSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,16 +433,16 @@ class _DetailsColumn extends StatelessWidget {
                 const BookingSectionTitle(
                   icon: Icons.lock_outline,
                   title: 'Privatsphäre und Ankunft',
-                  subtitle: 'Die genaue Adresse bleibt bis zur Buchung geschützt.',
+                  subtitle: 'Die genaue Adresse bleibt bis zur Bestätigung geschützt.',
                 ),
                 const SizedBox(height: 18),
                 const _TrustLine(
                   icon: Icons.location_off_outlined,
-                  text: 'Nur der ungefähre Standort ist öffentlich sichtbar.',
+                  text: 'Öffentlich ist nur der ungefähre Standort sichtbar.',
                 ),
                 const _TrustLine(
                   icon: Icons.qr_code_2,
-                  text: 'Nach der Buchung erhältst du einen sicheren Parking Pass.',
+                  text: 'Nach der Bestätigung erhältst du deinen Parking Pass.',
                 ),
                 _TrustLine(
                   icon: Icons.rule_outlined,
@@ -406,8 +461,8 @@ class _BookingPanel extends StatelessWidget {
     required this.owner,
     required this.checkingOwner,
     required this.totalCents,
-    required this.saved,
-    required this.onSaved,
+    required this.favorite,
+    required this.onFavorite,
     required this.onTimeChanged,
   });
 
@@ -415,8 +470,8 @@ class _BookingPanel extends StatelessWidget {
   final bool owner;
   final bool checkingOwner;
   final int totalCents;
-  final bool saved;
-  final VoidCallback onSaved;
+  final bool favorite;
+  final VoidCallback onFavorite;
   final VoidCallback onTimeChanged;
 
   @override
@@ -426,19 +481,20 @@ class _BookingPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Expanded(
                   child: BookingSectionTitle(
                     icon: Icons.calendar_month_outlined,
                     title: 'Zeitraum wählen',
-                    subtitle: 'Start und Ende für deine Buchung festlegen.',
+                    subtitle: 'Datum und Startzeit für die Buchung.',
                   ),
                 ),
                 IconButton.filledTonal(
-                  onPressed: onSaved,
-                  tooltip: saved ? 'Nicht mehr merken' : 'Stellplatz merken',
+                  onPressed: onFavorite,
+                  tooltip: favorite ? 'Nicht mehr merken' : 'Stellplatz merken',
                   icon: Icon(
-                    saved ? Icons.bookmark_rounded : Icons.bookmark_outline,
+                    favorite ? Icons.bookmark_rounded : Icons.bookmark_outline,
                   ),
                 ),
               ],
@@ -455,34 +511,25 @@ class _BookingPanel extends StatelessWidget {
               ),
               child: Wrap(
                 spacing: 12,
-                runSpacing: 10,
+                runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 alignment: WrapAlignment.spaceBetween,
                 children: [
-                  const ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 245),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  const SizedBox(
+                    width: 220,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.receipt_long_outlined, color: T.success),
-                        SizedBox(width: 10),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Voraussichtlicher Gesamtpreis',
-                                style: TextStyle(
-                                  color: T.muted,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                'Der Server bestätigt den verbindlichen Preis.',
-                                style: TextStyle(color: T.subtle, fontSize: 12),
-                              ),
-                            ],
+                        Text(
+                          'Voraussichtlicher Gesamtpreis',
+                          style: TextStyle(
+                            color: T.muted,
+                            fontWeight: FontWeight.w700,
                           ),
+                        ),
+                        Text(
+                          'Der Server bestätigt den verbindlichen Preis.',
+                          style: TextStyle(color: T.subtle, fontSize: 12),
                         ),
                       ],
                     ),
@@ -498,9 +545,9 @@ class _BookingPanel extends StatelessWidget {
               ),
             ),
             if (owner) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.all(15),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: T.amberSoft,
                   borderRadius: BorderRadius.circular(18),
@@ -540,23 +587,14 @@ class _BookingPanel extends StatelessWidget {
             ),
             if (!owner) ...[
               const SizedBox(height: 10),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, size: 16, color: T.muted),
-                  SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      'Adresse bleibt bis zur Bestätigung verborgen',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: T.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+              const Text(
+                'Die genaue Adresse bleibt bis zur Zahlungsbestätigung verborgen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: T.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ],
@@ -642,11 +680,11 @@ class _DarkPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(.08),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(.11)),
+          border: Border.all(color: Colors.white.withOpacity(.13)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -706,7 +744,7 @@ class _HeroMetric extends StatelessWidget {
                 ),
                 Text(
                   label,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                  style: const TextStyle(color: Colors.white60, fontSize: 10),
                 ),
               ],
             ),
