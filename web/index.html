@@ -19,12 +19,16 @@
   <link rel="canonical" href="https://parkplatz.smarbiz.sbs/">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <style>
+    html, body { width: 100%; min-height: 100%; margin: 0; overflow: hidden; }
+    body { background: #F5F2EA; }
+  </style>
 </head>
 <body>
   <noscript>FREIRAUM benötigt JavaScript.</noscript>
   <script>
     (async function () {
-      const resetKey = 'freiraum-service-worker-reset-20260718-v3';
+      const resetKey = 'freiraum-cache-reset-20260719-mobile-v4';
 
       if (window.location.hash.startsWith('#/')) {
         const legacyPath = window.location.hash.slice(1);
