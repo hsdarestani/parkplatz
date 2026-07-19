@@ -8,6 +8,7 @@ import '../../../config/design_tokens.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/freiraum_motion.dart';
 import '../../../shared/widgets/freiraum_scaffold.dart';
+import '../../favorites/data/favorites_repository.dart';
 import '../../host/data/host_repository.dart';
 import '../../parking/data/providers.dart';
 import 'booking_screens.dart' as legacy;
@@ -26,7 +27,6 @@ class PremiumParkingDetailScreen extends ConsumerStatefulWidget {
 class _PremiumParkingDetailScreenState
     extends ConsumerState<PremiumParkingDetailScreen> {
   late Future<bool> ownership = _ownsSpace();
-  bool saved = false;
 
   Future<bool> _ownsSpace() async {
     final auth = ref.read(authRepositoryProvider);
@@ -73,205 +73,242 @@ class _PremiumParkingDetailScreenState
       legacy.selectedEnd.difference(legacy.selectedStart).inHours,
     );
     final totalCents = (space.hourlyPrice * 100 * hours).round();
+    final favorite = ref.watch(favoritesProvider).contains(space.id);
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1160),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                MotionReveal(child: _ParkingHero(space: space, owner: owner)),
-                const SizedBox(height: 22),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final desktop = constraints.maxWidth >= 860;
-                    final details = MotionReveal(
-                      delay: const Duration(milliseconds: 90),
-                      child: _DetailsColumn(space: space),
-                    );
-                    final booking = MotionReveal(
-                      delay: const Duration(milliseconds: 150),
-                      child: _BookingPanel(
-                        space: space,
-                        owner: owner,
-                        checkingOwner: checkingOwner,
-                        totalCents: totalCents,
-                        saved: saved,
-                        onSaved: () => setState(() => saved = !saved),
-                        onTimeChanged: () => setState(() {}),
-                      ),
-                    );
-                    if (!desktop) {
-                      return Column(
-                        children: [details, const SizedBox(height: 18), booking],
-                      );
-                    }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 6, child: details),
-                        const SizedBox(width: 22),
-                        Expanded(flex: 4, child: booking),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, viewport) {
+        final mobile = viewport.maxWidth < 620;
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            mobile ? 14 : 24,
+            mobile ? 14 : 24,
+            mobile ? 14 : 24,
+            32,
           ),
-        ),
-      ],
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1160),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    MotionReveal(
+                      child: ParkingDetailHero(space: space, owner: owner),
+                    ),
+                    SizedBox(height: mobile ? 14 : 22),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final desktop = constraints.maxWidth >= 860;
+                        final details = MotionReveal(
+                          delay: const Duration(milliseconds: 90),
+                          child: _DetailsColumn(space: space),
+                        );
+                        final booking = MotionReveal(
+                          delay: const Duration(milliseconds: 150),
+                          child: _BookingPanel(
+                            space: space,
+                            owner: owner,
+                            checkingOwner: checkingOwner,
+                            totalCents: totalCents,
+                            saved: favorite,
+                            onSaved: () => ref
+                                .read(favoritesProvider.notifier)
+                                .toggle(space.id),
+                            onTimeChanged: () => setState(() {}),
+                          ),
+                        );
+                        if (!desktop) {
+                          return Column(
+                            children: [
+                              details,
+                              const SizedBox(height: 14),
+                              booking,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 6, child: details),
+                            const SizedBox(width: 22),
+                            Expanded(flex: 4, child: booking),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-class _ParkingHero extends StatelessWidget {
-  const _ParkingHero({required this.space, required this.owner});
+class ParkingDetailHero extends StatelessWidget {
+  const ParkingDetailHero({
+    super.key,
+    required this.space,
+    required this.owner,
+  });
 
   final ParkingSpace space;
   final bool owner;
 
   @override
-  Widget build(BuildContext context) => Container(
-        constraints: const BoxConstraints(minHeight: 280),
-        padding: const EdgeInsets.all(30),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0A1828), T.inkSoft, Color(0xFF12354A)],
-          ),
-          borderRadius: BorderRadius.circular(T.radiusSpacious),
-          boxShadow: T.shadowLarge,
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -20,
-              top: -40,
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: T.mint.withOpacity(.08),
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 620;
+          final veryCompact = constraints.maxWidth < 390;
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _DarkPill(
+                    icon: owner
+                        ? Icons.home_work_outlined
+                        : Icons.bolt_outlined,
+                    text: owner
+                        ? 'Dein Stellplatz'
+                        : space.instant
+                            ? 'Sofort buchbar'
+                            : 'Anfrage',
+                  ),
+                  _DarkPill(
+                    icon: space.verified
+                        ? Icons.verified_outlined
+                        : Icons.shield_outlined,
+                    text: space.verified
+                        ? 'Verifiziert'
+                        : 'Noch nicht verifiziert',
+                  ),
+                ],
+              ),
+              SizedBox(height: compact ? 16 : 18),
+              Text(
+                space.title,
+                maxLines: compact ? 3 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontSize: veryCompact
+                          ? 29
+                          : compact
+                              ? 34
+                              : 44,
+                      height: 1.03,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${space.district} · nahe ${space.landmark}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: compact ? 15 : 17,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-            Positioned(
-              right: 80,
-              bottom: -110,
-              child: Container(
-                width: 250,
-                height: 250,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: T.amber.withOpacity(.055),
-                ),
+              SizedBox(height: compact ? 18 : 22),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _HeroMetric(
+                    icon: Icons.directions_walk,
+                    value: '${space.walkingMinutes} Min.',
+                    label: 'zu Fuß',
+                    compact: compact,
+                  ),
+                  _HeroMetric(
+                    icon: Icons.star_rounded,
+                    value: space.rating.toStringAsFixed(1),
+                    label: '${space.reviewCount} Bewertungen',
+                    compact: compact,
+                  ),
+                  _HeroMetric(
+                    icon: Icons.euro,
+                    value: bookingMoney(
+                      (space.hourlyPrice * 100).round(),
+                    ),
+                    label: 'pro Stunde',
+                    compact: compact,
+                  ),
+                ],
               ),
+            ],
+          );
+
+          return Container(
+            constraints: BoxConstraints(minHeight: compact ? 0 : 280),
+            padding: EdgeInsets.all(compact ? 20 : 30),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0A1828), T.inkSoft, Color(0xFF12354A)],
+              ),
+              borderRadius: BorderRadius.circular(
+                compact ? 28 : T.radiusSpacious,
+              ),
+              boxShadow: T.shadowLarge,
             ),
-            Row(
+            child: Stack(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                Positioned(
+                  right: compact ? -70 : -20,
+                  top: compact ? -80 : -40,
+                  child: Container(
+                    width: compact ? 190 : 220,
+                    height: compact ? 190 : 220,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: T.mint.withOpacity(.08),
+                    ),
+                  ),
+                ),
+                if (compact)
+                  content
+                else
+                  Row(
                     children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _DarkPill(
-                            icon: owner
-                                ? Icons.home_work_outlined
-                                : Icons.bolt_outlined,
-                            text: owner
-                                ? 'Dein Stellplatz'
-                                : space.instant
-                                    ? 'Sofort buchbar'
-                                    : 'Anfrage',
-                          ),
-                          _DarkPill(
-                            icon: space.verified
-                                ? Icons.verified_outlined
-                                : Icons.shield_outlined,
-                            text: space.verified
-                                ? 'Verifiziert'
-                                : 'Noch nicht verifiziert',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        space.title,
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              color: Colors.white,
-                              fontSize: 44,
+                      Expanded(child: content),
+                      const SizedBox(width: 24),
+                      Hero(
+                        tag: 'parking-${space.id}',
+                        child: Container(
+                          width: 210,
+                          height: 210,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(.08),
+                            borderRadius: BorderRadius.circular(48),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(.11),
                             ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${space.district} · nahe ${space.landmark}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          ),
+                          child: Icon(
+                            space.covered
+                                ? Icons.garage_rounded
+                                : Icons.local_parking_rounded,
+                            size: 112,
+                            color: T.mint,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 22),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _HeroMetric(
-                            icon: Icons.directions_walk,
-                            value: '${space.walkingMinutes} Min.',
-                            label: 'zu Fuß',
-                          ),
-                          _HeroMetric(
-                            icon: Icons.star_rounded,
-                            value: space.rating.toStringAsFixed(1),
-                            label: '${space.reviewCount} Bewertungen',
-                          ),
-                          _HeroMetric(
-                            icon: Icons.euro,
-                            value: bookingMoney(
-                              (space.hourlyPrice * 100).round(),
-                            ),
-                            label: 'pro Stunde',
-                          ),
-                        ],
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 24),
-                Hero(
-                  tag: 'parking-${space.id}',
-                  child: Container(
-                    width: 210,
-                    height: 210,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.08),
-                      borderRadius: BorderRadius.circular(48),
-                      border: Border.all(color: Colors.white.withOpacity(.11)),
-                    ),
-                    child: Icon(
-                      space.covered
-                          ? Icons.garage_rounded
-                          : Icons.local_parking_rounded,
-                      size: 112,
-                      color: T.mint,
-                    ),
-                  ),
-                ),
               ],
             ),
-          ],
-        ),
+          );
+        },
       );
 }
 
@@ -293,36 +330,47 @@ class _DetailsColumn extends StatelessWidget {
                   subtitle: 'Alle wichtigen Eigenschaften auf einen Blick.',
                 ),
                 const SizedBox(height: 18),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _FeatureTile(
-                      icon: Icons.straighten_outlined,
-                      title: 'Fahrzeugmaße',
-                      value: space.dimensions(),
-                    ),
-                    _FeatureTile(
-                      icon: Icons.meeting_room_outlined,
-                      title: 'Zufahrt',
-                      value: space.accessLabel(),
-                    ),
-                    _FeatureTile(
-                      icon: Icons.roofing_outlined,
-                      title: 'Schutz',
-                      value: space.covered ? 'Überdacht' : 'Freifläche',
-                    ),
-                    _FeatureTile(
-                      icon: Icons.ev_station_outlined,
-                      title: 'E-Mobilität',
-                      value: space.ev ? 'Lademöglichkeit' : 'Ohne Ladepunkt',
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final itemWidth = constraints.maxWidth < 560
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 12) / 2;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _FeatureTile(
+                          width: itemWidth,
+                          icon: Icons.straighten_outlined,
+                          title: 'Fahrzeugmaße',
+                          value: space.dimensions(),
+                        ),
+                        _FeatureTile(
+                          width: itemWidth,
+                          icon: Icons.meeting_room_outlined,
+                          title: 'Zufahrt',
+                          value: space.accessLabel(),
+                        ),
+                        _FeatureTile(
+                          width: itemWidth,
+                          icon: Icons.roofing_outlined,
+                          title: 'Schutz',
+                          value: space.covered ? 'Überdacht' : 'Freifläche',
+                        ),
+                        _FeatureTile(
+                          width: itemWidth,
+                          icon: Icons.ev_station_outlined,
+                          title: 'E-Mobilität',
+                          value: space.ev ? 'Lademöglichkeit' : 'Ohne Ladepunkt',
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           BookingSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +431,7 @@ class _BookingPanel extends StatelessWidget {
                   child: BookingSectionTitle(
                     icon: Icons.calendar_month_outlined,
                     title: 'Zeitraum wählen',
-                    subtitle: 'Aktuell sind zwei Stunden ausgewählt.',
+                    subtitle: 'Start und Ende für deine Buchung festlegen.',
                   ),
                 ),
                 IconButton.filledTonal(
@@ -399,30 +447,42 @@ class _BookingPanel extends StatelessWidget {
             PremiumBookingTimeSelector(onChanged: onTimeChanged),
             const SizedBox(height: 18),
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: T.surfaceRaised,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: T.line),
               ),
-              child: Row(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.receipt_long_outlined, color: T.success),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 245),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'Voraussichtlicher Gesamtpreis',
-                          style: TextStyle(
-                            color: T.muted,
-                            fontWeight: FontWeight.w700,
+                        Icon(Icons.receipt_long_outlined, color: T.success),
+                        SizedBox(width: 10),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Voraussichtlicher Gesamtpreis',
+                                style: TextStyle(
+                                  color: T.muted,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                'Der Server bestätigt den verbindlichen Preis.',
+                                style: TextStyle(color: T.subtle, fontSize: 12),
+                              ),
+                            ],
                           ),
-                        ),
-                        Text(
-                          'Der Server bestätigt den verbindlichen Preis.',
-                          style: TextStyle(color: T.subtle, fontSize: 12),
                         ),
                       ],
                     ),
@@ -506,18 +566,20 @@ class _BookingPanel extends StatelessWidget {
 
 class _FeatureTile extends StatelessWidget {
   const _FeatureTile({
+    required this.width,
     required this.icon,
     required this.title,
     required this.value,
   });
 
+  final double width;
   final IconData icon;
   final String title;
   final String value;
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 240,
+        width: width,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: T.surfaceRaised,
@@ -608,15 +670,20 @@ class _HeroMetric extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.label,
+    required this.compact,
   });
 
   final IconData icon;
   final String value;
   final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 13,
+          vertical: compact ? 8 : 10,
+        ),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(.07),
           borderRadius: BorderRadius.circular(16),
@@ -625,8 +692,8 @@ class _HeroMetric extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: T.mint, size: 19),
-            const SizedBox(width: 8),
+            Icon(icon, color: T.mint, size: compact ? 17 : 19),
+            const SizedBox(width: 7),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
