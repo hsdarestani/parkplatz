@@ -3,6 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/network/api_client.dart';
+import '../../features/parking/data/providers.dart';
+import '../../features/search/presentation/search_controller.dart';
 
 class WalkingRoute {
   const WalkingRoute({
@@ -88,6 +90,32 @@ final walkingRoutingRepositoryProvider = Provider<WalkingRoutingRepository>(
 
 final walkingRouteProvider =
     FutureProvider.family<WalkingRoute?, RouteRequest>((ref, request) async {
+  final selectedId = ref.watch(selectedParkingIdProvider);
+  final selected = ref
+      .watch(parkingResultsListProvider)
+      .where((space) => space.id == selectedId)
+      .firstOrNull;
+  if (selected == null) return null;
+
+  final query = ref.watch(searchProvider);
+  final currentLocation = ref.watch(userLocationProvider).valueOrNull;
+  final expected = query.destination != null
+      ? RouteRequest(
+          fromLat: selected.lat,
+          fromLng: selected.lng,
+          toLat: query.destination!.lat,
+          toLng: query.destination!.lng,
+        )
+      : currentLocation == null
+          ? null
+          : RouteRequest(
+              fromLat: currentLocation.latitude,
+              fromLng: currentLocation.longitude,
+              toLat: selected.lat,
+              toLng: selected.lng,
+            );
+  if (expected == null || expected != request) return null;
+
   try {
     return await ref.watch(walkingRoutingRepositoryProvider).route(request);
   } catch (_) {
