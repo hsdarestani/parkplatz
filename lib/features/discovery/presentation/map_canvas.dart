@@ -39,8 +39,37 @@ class _FreiraumMapState extends ConsumerState<FreiraumMap> {
           );
     final compact = MediaQuery.sizeOf(context).width < 620;
 
+    ref.listen<String?>(selectedParkingIdProvider, (previous, next) {
+      if (next == null || next == previous) return;
+      final current = ref
+          .read(parkingResultsListProvider)
+          .where((space) => space.id == next)
+          .firstOrNull;
+      if (current == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _controller.move(
+            LatLng(current.lat, current.lng),
+            compact ? 14.1 : 14.7,
+          );
+        }
+      });
+    });
+
+    ref.listen<Destination?>(
+      searchProvider.select((value) => value.destination),
+      (previous, next) {
+        if (next == null || next.id == previous?.id) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _controller.move(LatLng(next.lat, next.lng), compact ? 13.2 : 13.8);
+          }
+        });
+      },
+    );
+
     return Semantics(
-      label: 'Interaktive Frankfurt-Karte mit ungefähren Stellplatzpositionen',
+      label: 'Interaktive Karte mit ungefähren Stellplatzpositionen',
       child: ClipRect(
         child: Stack(
           fit: StackFit.expand,
@@ -50,8 +79,8 @@ class _FreiraumMapState extends ConsumerState<FreiraumMap> {
               options: MapOptions(
                 initialCenter: center,
                 initialZoom: compact ? 12.8 : 13.2,
-                minZoom: 11,
-                maxZoom: 17,
+                minZoom: 10,
+                maxZoom: 18,
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
@@ -86,21 +115,18 @@ class _FreiraumMapState extends ConsumerState<FreiraumMap> {
                         ),
                         width: isSelected
                             ? compact
-                                ? 150
-                                : 190
-                            : 78,
+                                ? 165
+                                : 200
+                            : 82,
                         height: isSelected ? 58 : 44,
                         alignment: Alignment.center,
                         child: _ParkingBeacon(
                           space: space,
+                          destination: query.destination,
                           selected: isSelected,
                           onTap: () {
                             ref.read(selectedParkingIdProvider.notifier).state =
                                 space.id;
-                            _controller.move(
-                              LatLng(space.lat, space.lng),
-                              compact ? 14.1 : 14.7,
-                            );
                             SemanticsService.announce(
                               '${space.title} ausgewählt',
                               Directionality.of(context),
@@ -141,71 +167,74 @@ class _FreiraumMapState extends ConsumerState<FreiraumMap> {
 class _ParkingBeacon extends StatelessWidget {
   const _ParkingBeacon({
     required this.space,
+    required this.destination,
     required this.selected,
     required this.onTap,
   });
 
   final ParkingSpace space;
+  final Destination? destination;
   final bool selected;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        selected: selected,
-        label:
-            '${space.title}, ${space.walkingMinutes} Minuten zu Fuß, ${space.hourlyPrice.toStringAsFixed(0)} Euro pro Stunde',
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: T.normal,
-            curve: T.emphasized,
-            padding: EdgeInsets.symmetric(
-              horizontal: selected ? 11 : 9,
-              vertical: selected ? 9 : 7,
+  Widget build(BuildContext context) {
+    final price = space.free ? 'Frei' : '${space.hourlyPrice.toStringAsFixed(0)} €';
+    final minutes = space.walkingMinutesTo(destination);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${space.title}, ungefähr $minutes Minuten zu Fuß, $price',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: T.normal,
+          curve: T.emphasized,
+          padding: EdgeInsets.symmetric(
+            horizontal: selected ? 11 : 9,
+            vertical: selected ? 9 : 7,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? T.ink : T.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: T.mint,
+              width: selected ? 2.5 : 1.5,
             ),
-            decoration: BoxDecoration(
-              color: selected ? T.ink : T.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: T.mint,
-                width: selected ? 2.5 : 1.5,
+            boxShadow: selected ? T.shadowLarge : T.markerShadow,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: const BoxDecoration(
+                  color: T.mint,
+                  shape: BoxShape.circle,
+                ),
               ),
-              boxShadow: selected ? T.shadowLarge : T.markerShadow,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: const BoxDecoration(
-                    color: T.mint,
-                    shape: BoxShape.circle,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  selected ? 'ca. $minutes Min · $price' : price,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? Colors.white : T.ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: selected ? 13 : 12,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    selected
-                        ? '${space.walkingMinutes} Min · ${space.hourlyPrice.toStringAsFixed(0)} €'
-                        : '${space.hourlyPrice.toStringAsFixed(0)} €',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected ? Colors.white : T.ink,
-                      fontWeight: FontWeight.w900,
-                      fontSize: selected ? 13 : 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _DestinationPulse extends StatelessWidget {
