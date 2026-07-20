@@ -22,7 +22,7 @@ void main() {
   test('parking compatibility logic works', () {
     final space = DemoParkingRepository.spaces.first;
     expect(space.fits(demoVehicles.first), isTrue);
-    expect(space.fits(demoVehicles[2]), isFalse);
+    expect(space.fits(demoVehicles.last), isFalse);
   });
 
   test('filters and sorting update results', () {
@@ -82,15 +82,15 @@ void main() {
   });
 
   test('host listing API payload hides local-only fields', () {
-    const space = HostSpaceRecord(
-      id: 'local-id',
-      title: 'Innenhof Sachsenhausen',
-      district: 'Sachsenhausen',
-      landmark: 'Schweizer Platz',
-      latitude: 50.104,
-      longitude: 8.689,
-      exactAddress: 'Musterstraße 12',
-      entranceInstructions: 'Durch das grüne Tor fahren.',
+    final record = HostSpaceRecord(
+      id: '',
+      title: 'Innenhof',
+      district: 'Nordend',
+      landmark: 'Glauburgstraße',
+      latitude: 50.13,
+      longitude: 8.69,
+      exactAddress: 'Musterweg 7',
+      entranceInstructions: 'Durch das Tor fahren.',
       hourlyPriceCents: 350,
       maxHeight: 2.1,
       maxWidth: 2.5,
@@ -98,14 +98,16 @@ void main() {
       accessType: 'gate',
       covered: false,
       evCharging: false,
-      accessible: true,
+      accessible: false,
       instantBookable: true,
       verified: false,
       status: 'active',
     );
 
-    expect(space.toApi(), isNot(contains('id')));
-    expect(space.toApi(), isNot(contains('status')));
-    expect(space.toApi()['exact_address'], 'Musterstraße 12');
+    final payload = record.toCreateJson();
+    expect(payload.containsKey('id'), isFalse);
+    expect(payload.containsKey('status'), isFalse);
+    expect(payload.containsKey('is_verified'), isFalse);
+    expect(payload['exact_address'], 'Musterweg 7');
   });
 }
