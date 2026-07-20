@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/network/api_client.dart';
+import '../../features/booking/data/repositories.dart';
 import '../../features/parking/data/providers.dart';
 import '../../features/search/presentation/search_controller.dart';
 
