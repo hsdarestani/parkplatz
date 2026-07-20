@@ -53,10 +53,11 @@ ensure_env STRIPE_WEBHOOK_SECRET ""
 # Move existing beta installations to the selected direct-payment MVP mode.
 sed -i 's/^PAYMENT_MODE=beta$/PAYMENT_MODE=direct/' .env.production
 
-# Trust moderation is locked unless one or more comma-separated admin emails
-# are deliberately configured on the server.
+# Trust moderation and service integrations use the official parking mailbox.
 ensure_env ADMIN_EMAILS ""
-ensure_env TRUST_SUPPORT_EMAIL info@aplus-solution.de
+ensure_env TRUST_SUPPORT_EMAIL parkplatz@aplus-solution.de
+ensure_env PRIMARY_EMAIL parkplatz@aplus-solution.de
+ensure_env NOMINATIM_CONTACT_EMAIL parkplatz@aplus-solution.de
 
 # EMAIL_MODE=auto starts real delivery as soon as SMTP_HOST is configured.
 ensure_env EMAIL_MODE auto
@@ -64,16 +65,22 @@ ensure_env SMTP_HOST ""
 ensure_env SMTP_PORT 587
 ensure_env SMTP_USERNAME ""
 ensure_env SMTP_PASSWORD ""
-ensure_env SMTP_FROM_EMAIL info@aplus-solution.de
+ensure_env SMTP_FROM_EMAIL parkplatz@aplus-solution.de
 ensure_env SMTP_FROM_NAME FREIRAUM
 ensure_env SMTP_SSL false
 ensure_env SMTP_STARTTLS true
 ensure_env NOTIFICATION_POLL_SECONDS 15
 ensure_env PASSWORD_RESET_MINUTES 30
 
-# Upgrade installations that still use the former outbox-only default.
+# Upgrade installations that still use former or misspelled defaults.
 sed -i 's/^EMAIL_MODE=outbox$/EMAIL_MODE=auto/' .env.production
-sed -i 's/^TRUST_SUPPORT_EMAIL=support@freiraum\.app$/TRUST_SUPPORT_EMAIL=info@aplus-solution.de/' .env.production
+sed -i 's/^TRUST_SUPPORT_EMAIL=support@freiraum\.app$/TRUST_SUPPORT_EMAIL=parkplatz@aplus-solution.de/' .env.production
+sed -i 's/^TRUST_SUPPORT_EMAIL=info@aplus-solution\.de$/TRUST_SUPPORT_EMAIL=parkplatz@aplus-solution.de/' .env.production
+sed -i 's/^TRUST_SUPPORT_EMAIL=parkplat@aplus-solution\.de$/TRUST_SUPPORT_EMAIL=parkplatz@aplus-solution.de/' .env.production
+sed -i 's/^SMTP_FROM_EMAIL=info@aplus-solution\.de$/SMTP_FROM_EMAIL=parkplatz@aplus-solution.de/' .env.production
+sed -i 's/^SMTP_FROM_EMAIL=parkplat@aplus-solution\.de$/SMTP_FROM_EMAIL=parkplatz@aplus-solution.de/' .env.production
+sed -i 's/^PRIMARY_EMAIL=parkplat@aplus-solution\.de$/PRIMARY_EMAIL=parkplatz@aplus-solution.de/' .env.production
+sed -i 's/^NOMINATIM_CONTACT_EMAIL=parkplat@aplus-solution\.de$/NOMINATIM_CONTACT_EMAIL=parkplatz@aplus-solution.de/' .env.production
 
 # Stripe requires Checkout expiration to be at least 30 minutes in the future.
 # Keep the safe value for installations that later switch Stripe back on.
@@ -82,7 +89,7 @@ sed -i 's/^PAYMENT_HOLD_MINUTES=30$/PAYMENT_HOLD_MINUTES=31/' .env.production
 chmod 600 .env.production
 
 docker compose -f "$COMPOSE_FILE" up -d db
-docker compose -f "$COMPOSE_FILE" run --rm api alembic upgrade head
+docker compose -f "$COMPOSE_FILE" run --rm api alembic upgrade heads
 docker compose -f "$COMPOSE_FILE" run --rm api python -m app.db.seed
 docker compose -f "$COMPOSE_FILE" up -d --build
 
