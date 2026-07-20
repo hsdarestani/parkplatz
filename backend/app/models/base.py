@@ -31,6 +31,7 @@ class User(Timestamp, Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str]
     display_name: Mapped[str]
+    profile_image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
@@ -108,6 +109,9 @@ class ParkingSpaceImage(Base):
     image_url: Mapped[str]
     sort_order: Mapped[int] = mapped_column(default=0)
     alt_text: Mapped[str]
+    approval_status: Mapped[str] = mapped_column(String(24), default="pending")
+    ai_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 class AvailabilityRule(Base):
@@ -195,4 +199,26 @@ class BookingEvent(Base):
     )
     event_type: Mapped[str]
     event_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+    __table_args__ = (UniqueConstraint("booking_id", name="uq_reviews_booking_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    booking_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"),
+        index=True,
+    )
+    parking_space_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("parking_spaces.id", ondelete="CASCADE"),
+        index=True,
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    rating: Mapped[int]
+    comment: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
