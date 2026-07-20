@@ -40,7 +40,18 @@ jobs:
           python-version: "3.12"
       - run: pip install -e '.[test]'
       - run: ruff check app tests
-      - run: alembic upgrade head
+      - name: Run database migrations
+        run: |
+          set +e
+          alembic upgrade head 2>&1 | tee ../alembic-upgrade.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload migration diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-migration-diagnostics
+          path: alembic-upgrade.log
+          if-no-files-found: error
       - run: python -m app.db.seed && python -m app.db.seed
       - run: pytest
       - name: Build backend image
@@ -57,7 +68,18 @@ jobs:
           channel: stable
           cache: true
       - run: flutter --version
-      - run: flutter pub get
+      - name: Resolve Flutter dependencies
+        run: |
+          set +e
+          flutter pub get 2>&1 | tee flutter-pub-get.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload dependency diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-dependency-diagnostics
+          path: flutter-pub-get.log
+          if-no-files-found: error
       - run: dart format --output=none lib test
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
