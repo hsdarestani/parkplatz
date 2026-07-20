@@ -80,7 +80,7 @@ class HostListingValidation {
   static String? price(String? value) => _number(
         value,
         label: 'Preis pro Stunde',
-        min: 0.50,
+        min: 0,
         max: 1000,
       );
 
