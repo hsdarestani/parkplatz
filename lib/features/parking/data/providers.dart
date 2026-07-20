@@ -74,18 +74,60 @@ final parkingSpacesProvider = FutureProvider<List<ParkingSpace>>((ref) async {
   return repository.all();
 });
 
-final parkingResultsProvider = Provider<AsyncValue<List<ParkingSpace>>>((ref) {
+final selectedParkingIdProvider = StateProvider<String?>((ref) => null);
+
+final parkingResultsProvider = FutureProvider<List<ParkingSpace>>((ref) async {
   final query = ref.watch(searchProvider);
-  return ref
-      .watch(parkingSpacesProvider)
-      .whenData((spaces) => filterParkingSpaces(spaces, query));
+  final spaces = await ref.watch(parkingSpacesProvider.future);
+  var results = filterParkingSpaces(spaces, query).where((space) {
+    final filters = query.filters;
+    final garageOk = !filters.contains('garage') ||
+        space.access == AccessType.tiefgarage;
+    final indoorOk = !filters.contains('indoor') || space.indoor;
+    final outdoorOk = !filters.contains('outdoor') || space.outdoor;
+    final freeOk = !filters.contains('free') || space.free;
+    return garageOk && indoorOk && outdoorOk && freeOk;
+  }).toList();
+
+  if (query.valid) {
+    final availability = ref.watch(availabilityRepositoryProvider);
+    final checks = await Future.wait(
+      results.map(
+        (space) async => (
+          space,
+          await availability.check(space.id, query.start, query.end),
+        ),
+      ),
+    );
+    results = checks
+        .where((entry) => entry.$2.available)
+        .map((entry) => entry.$1)
+        .toList();
+  }
+
+  if (query.sort == 'Preis') {
+    results.sort((a, b) => a.hourlyPrice.compareTo(b.hourlyPrice));
+  } else if (query.sort == 'Entfernung') {
+    results.sort(
+      (a, b) => a
+          .walkingMetersTo(query.destination)
+          .compareTo(b.walkingMetersTo(query.destination)),
+    );
+  }
+
+  final selected = ref.watch(selectedParkingIdProvider);
+  final selectedIndex =
+      selected == null ? -1 : results.indexWhere((space) => space.id == selected);
+  if (selectedIndex > 0) {
+    final pinned = results.removeAt(selectedIndex);
+    results.insert(0, pinned);
+  }
+  return results;
 });
 
 final parkingSpaceProvider = FutureProvider.family<ParkingSpace?, String>((ref, id) {
   return ref.watch(parkingRepositoryProvider).byId(id);
 });
-
-final selectedParkingIdProvider = StateProvider<String?>((ref) => null);
 
 final parkingResultsListProvider = Provider<List<ParkingSpace>>(
   (ref) => ref.watch(parkingResultsProvider).valueOrNull ?? const [],
