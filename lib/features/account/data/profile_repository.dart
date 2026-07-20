@@ -28,6 +28,9 @@ class ProfileUser {
       );
 }
 
+// Compatibility for older screens and tests that imported AppUser.
+typedef AppUser = ProfileUser;
+
 abstract interface class ProfileRepository {
   Future<ProfileUser> read();
   Future<ProfileUser> updateDisplayName(String displayName);
