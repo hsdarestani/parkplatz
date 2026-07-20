@@ -10,9 +10,9 @@ import '../features/booking/presentation/booking_screens.dart';
 import '../features/booking/presentation/direct_my_bookings_screen.dart';
 import '../features/booking/presentation/premium_confirmation_pass.dart';
 import '../features/booking/presentation/premium_parking_detail.dart';
-import '../features/discovery/presentation/discovery_screen.dart';
+import '../features/discovery/presentation/discovery_screen_v2.dart';
 import '../features/favorites/presentation/favorites_screen.dart';
-import '../features/host/presentation/host_listing_wizard.dart';
+import '../features/host/presentation/host_listing_wizard_v2.dart';
 import '../features/host/presentation/host_manage_screen.dart';
 import '../features/host/presentation/host_operations_dashboard.dart';
 import '../features/launch/launch_screen.dart';
@@ -39,11 +39,11 @@ GoRouter createRouter() => GoRouter(
         ),
         GoRoute(
           path: '/discover',
-          builder: (context, state) => const DiscoveryScreen(),
+          builder: (context, state) => const DiscoveryScreenV2(),
         ),
         GoRoute(
           path: '/search',
-          builder: (context, state) => const DiscoveryScreen(results: true),
+          builder: (context, state) => const DiscoveryScreenV2(results: true),
         ),
         GoRoute(
           path: '/favorites',
@@ -145,7 +145,7 @@ GoRouter createRouter() => GoRouter(
         GoRoute(
           path: '/host/new',
           builder: (context, state) =>
-              _protected('/host/new', const HostListingWizardScreen()),
+              _protected('/host/new', const HostListingWizardV2Screen()),
         ),
         GoRoute(
           path: '/host/finance',
