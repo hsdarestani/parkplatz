@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, or_, select
@@ -25,25 +25,65 @@ class AvailabilityDecision:
     hourly_price_cents: int
 
 
+def _rule_for_segment(
+    rules: list[AvailabilityRule],
+    segment_start: datetime,
+    segment_end: datetime,
+) -> AvailabilityRule | None:
+    start_time = segment_start.time().replace(tzinfo=None)
+    reaches_midnight = segment_end.date() > segment_start.date()
+    end_time = (
+        time(23, 59)
+        if reaches_midnight
+        else segment_end.time().replace(tzinfo=None)
+    )
+
+    for rule in rules:
+        if (
+            rule.active
+            and rule.weekday == segment_start.weekday()
+            and rule.start_time <= start_time
+            and rule.end_time >= end_time
+        ):
+            return rule
+    return None
+
+
+def matching_rules(
+    rules: list[AvailabilityRule],
+    start_at: datetime,
+    end_at: datetime,
+) -> list[AvailabilityRule] | None:
+    """Return one covering rule for every local calendar-day segment."""
+    local_start = start_at.astimezone(FRANKFURT_TIMEZONE)
+    local_end = end_at.astimezone(FRANKFURT_TIMEZONE)
+    matched: list[AvailabilityRule] = []
+    cursor = local_start
+
+    while cursor < local_end:
+        next_midnight = datetime.combine(
+            cursor.date() + timedelta(days=1),
+            time.min,
+            tzinfo=FRANKFURT_TIMEZONE,
+        )
+        segment_end = min(local_end, next_midnight)
+        rule = _rule_for_segment(rules, cursor, segment_end)
+        if rule is None:
+            return None
+        matched.append(rule)
+        cursor = segment_end
+
+    return matched
+
+
 def matching_rule(
     rules: list[AvailabilityRule],
     start_at: datetime,
     end_at: datetime,
 ) -> AvailabilityRule | None:
-    local_start = start_at.astimezone(FRANKFURT_TIMEZONE)
-    local_end = end_at.astimezone(FRANKFURT_TIMEZONE)
-    if local_start.date() != local_end.date():
-        return None
-
-    for rule in rules:
-        if (
-            rule.active
-            and rule.weekday == local_start.weekday()
-            and rule.start_time <= local_start.time().replace(tzinfo=None)
-            and rule.end_time >= local_end.time().replace(tzinfo=None)
-        ):
-            return rule
-    return None
+    """Backward-compatible helper for callers and tests using a single day."""
+    values = matching_rules(rules, start_at, end_at)
+    return values[0] if values and len(values) == 1 else None
 
 
 async def evaluate_availability(
@@ -68,12 +108,15 @@ async def evaluate_availability(
             )
         ).all()
     )
-    rule = matching_rule(rules, start_at, end_at) if rules else None
-    if rules and rule is None:
+    matched = matching_rules(rules, start_at, end_at) if rules else []
+    if rules and matched is None:
         return AvailabilityDecision(
             available=False,
             code="outside_schedule",
-            message="Der Stellplatz ist zu diesem Zeitpunkt nicht freigegeben.",
+            message=(
+                "Der Stellplatz ist nicht für den gesamten gewählten Zeitraum "
+                "freigegeben."
+            ),
             hourly_price_cents=parking_space.hourly_price_cents,
         )
 
@@ -126,9 +169,14 @@ async def evaluate_availability(
             hourly_price_cents=parking_space.hourly_price_cents,
         )
 
-    effective_price = (
+    overrides = {
         rule.price_override_cents
-        if rule is not None and rule.price_override_cents is not None
+        for rule in (matched or [])
+        if rule.price_override_cents is not None
+    }
+    effective_price = (
+        overrides.pop()
+        if len(overrides) == 1
         else parking_space.hourly_price_cents
     )
     return AvailabilityDecision(
