@@ -114,14 +114,6 @@ final parkingResultsProvider = FutureProvider<List<ParkingSpace>>((ref) async {
           .compareTo(b.walkingMetersTo(query.destination)),
     );
   }
-
-  final selected = ref.watch(selectedParkingIdProvider);
-  final selectedIndex =
-      selected == null ? -1 : results.indexWhere((space) => space.id == selected);
-  if (selectedIndex > 0) {
-    final pinned = results.removeAt(selectedIndex);
-    results.insert(0, pinned);
-  }
   return results;
 });
 
@@ -129,6 +121,12 @@ final parkingSpaceProvider = FutureProvider.family<ParkingSpace?, String>((ref, 
   return ref.watch(parkingRepositoryProvider).byId(id);
 });
 
-final parkingResultsListProvider = Provider<List<ParkingSpace>>(
-  (ref) => ref.watch(parkingResultsProvider).valueOrNull ?? const [],
-);
+final parkingResultsListProvider = Provider<List<ParkingSpace>>((ref) {
+  final values = ref.watch(parkingResultsProvider).valueOrNull ?? const [];
+  final selected = ref.watch(selectedParkingIdProvider);
+  if (selected == null || values.length < 2) return values;
+
+  final selectedIndex = values.indexWhere((space) => space.id == selected);
+  if (selectedIndex <= 0) return values;
+  return [values[selectedIndex], ...values.take(selectedIndex), ...values.skip(selectedIndex + 1)];
+});
