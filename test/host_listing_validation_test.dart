@@ -17,9 +17,10 @@ void main() {
     );
   });
 
-  test('localized numbers and API ranges are accepted', () {
+  test('localized numbers, free prices and API ranges are accepted', () {
     expect(HostListingValidation.parseNumber('3,50'), 3.5);
-    expect(HostListingValidation.price('0,49'), isNotNull);
+    expect(HostListingValidation.price('0'), isNull);
+    expect(HostListingValidation.price('0,49'), isNull);
     expect(HostListingValidation.price('13'), isNull);
     expect(HostListingValidation.latitude('91'), isNotNull);
     expect(HostListingValidation.longitude('8,6821'), isNull);
@@ -39,7 +40,7 @@ void main() {
       heightValue: '2,10',
       widthValue: '2,50',
       lengthValue: '5,20',
-      priceValue: '13',
+      priceValue: '0',
     );
 
     expect(error, 'Titel muss mindestens 3 Zeichen enthalten.');
