@@ -53,7 +53,7 @@ class HostParkingSpaceIn(BaseModel):
     longitude: float = Field(ge=-180, le=180)
     exact_address: str = Field(min_length=5, max_length=240)
     entrance_instructions: str = Field(min_length=5, max_length=1000)
-    hourly_price_cents: int = Field(ge=50, le=100_000)
+    hourly_price_cents: int = Field(ge=0, le=100_000)
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     max_height_m: float = Field(gt=0, le=10)
     max_width_m: float = Field(gt=0, le=10)
@@ -80,7 +80,7 @@ class HostAvailabilityRuleIn(BaseModel):
     active: bool = True
     start_time: time = time(0, 0)
     end_time: time = time(23, 59)
-    price_override_cents: int | None = Field(default=None, ge=50, le=100_000)
+    price_override_cents: int | None = Field(default=None, ge=0, le=100_000)
 
     @model_validator(mode="after")
     def validate_time_range(self) -> "HostAvailabilityRuleIn":
