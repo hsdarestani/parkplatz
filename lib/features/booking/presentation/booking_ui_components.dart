@@ -88,62 +88,97 @@ class PremiumBookingTimeSelector extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => _pickDate(context, ref),
-              icon: const Icon(Icons.calendar_today_outlined),
-              label: Text(bookingDateOnly(query.start)),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _pickStartTime(context, ref),
-              icon: const Icon(Icons.login_rounded),
-              label: Text('Einfahrt ${bookingTime(query.start)}'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _pickEndTime(context, ref),
-              icon: const Icon(Icons.logout_rounded),
-              label: Text('Ausfahrt ${bookingTime(query.end)}'),
-            ),
-          ],
+        _RangeRow(
+          icon: Icons.login_rounded,
+          title: 'Einfahrt',
+          date: bookingDateOnly(query.start),
+          time: bookingTime(query.start),
+          onDate: () => _pickStartDate(context, ref),
+          onTime: () => _pickStartTime(context, ref),
+        ),
+        const SizedBox(height: 10),
+        _RangeRow(
+          icon: Icons.logout_rounded,
+          title: 'Ausfahrt',
+          date: bookingDateOnly(query.end),
+          time: bookingTime(query.end),
+          onDate: () => _pickEndDate(context, ref),
+          onTime: () => _pickEndTime(context, ref),
         ),
         const SizedBox(height: 14),
-        Row(
-          children: [
-            const Icon(Icons.timelapse_outlined, color: T.success),
-            const SizedBox(width: 9),
-            Text(
-              '${query.hours} ${query.hours == 1 ? 'Stunde' : 'Stunden'}',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [T.ink, T.inkSoft]),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.timelapse_rounded, color: T.mint),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Gesamtdauer',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    Text(
+                      query.durationLabel(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        Slider(
-          value: query.hours.toDouble(),
-          min: 1,
-          max: 24,
-          divisions: 23,
-          label: '${query.hours} Std.',
-          onChanged: (value) {
-            ref.read(searchProvider.notifier).duration(value.round());
-            onChanged();
-          },
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: const [
+            (label: '2 Std.', duration: Duration(hours: 2)),
+            (label: '4 Std.', duration: Duration(hours: 4)),
+            (label: '8 Std.', duration: Duration(hours: 8)),
+            (label: '1 Tag', duration: Duration(days: 1)),
+            (label: '3 Tage', duration: Duration(days: 3)),
+            (label: '7 Tage', duration: Duration(days: 7)),
+          ]
+              .map(
+                (option) => ActionChip(
+                  avatar: const Icon(Icons.schedule_rounded, size: 16),
+                  label: Text(option.label),
+                  onPressed: () {
+                    ref
+                        .read(searchProvider.notifier)
+                        .durationValue(option.duration);
+                    onChanged();
+                  },
+                ),
+              )
+              .toList(),
         ),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: T.mintSoft,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: T.mint),
           ),
           child: Row(
             children: [
-              const Icon(Icons.event_available_outlined, color: T.success),
+              const Icon(Icons.event_available_rounded, color: T.success),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '${bookingDateTime(query.start)} bis ${bookingTime(query.end)} Uhr',
+                  '${bookingDateTime(query.start)} bis ${bookingDateTime(query.end)}',
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -154,26 +189,46 @@ class PremiumBookingTimeSelector extends ConsumerWidget {
     );
   }
 
-  Future<void> _pickDate(BuildContext context, WidgetRef ref) async {
+  Future<void> _pickStartDate(BuildContext context, WidgetRef ref) async {
     final query = ref.read(searchProvider);
     final today = DateTime.now();
-    final initial = query.start.isBefore(today) ? today : query.start;
-    final date = await showDatePicker(
+    final selected = await showDatePicker(
       context: context,
-      firstDate: today,
+      firstDate: DateTime(today.year, today.month, today.day),
       lastDate: today.add(const Duration(days: 365)),
-      initialDate: initial,
+      initialDate: query.start.isBefore(today) ? today : query.start,
     );
-    if (date == null) return;
+    if (selected == null) return;
     ref.read(searchProvider.notifier).start(
           DateTime(
-            date.year,
-            date.month,
-            date.day,
+            selected.year,
+            selected.month,
+            selected.day,
             query.start.hour,
             query.start.minute,
           ),
         );
+    onChanged();
+  }
+
+  Future<void> _pickEndDate(BuildContext context, WidgetRef ref) async {
+    final query = ref.read(searchProvider);
+    final selected = await showDatePicker(
+      context: context,
+      firstDate: DateTime(query.start.year, query.start.month, query.start.day),
+      lastDate: query.start.add(const Duration(days: 30)),
+      initialDate: query.end.isBefore(query.start) ? query.start : query.end,
+    );
+    if (selected == null) return;
+    var end = DateTime(
+      selected.year,
+      selected.month,
+      selected.day,
+      query.end.hour,
+      query.end.minute,
+    );
+    if (!end.isAfter(query.start)) end = query.start.add(const Duration(hours: 1));
+    ref.read(searchProvider.notifier).range(query.start, end);
     onChanged();
   }
 
@@ -204,9 +259,9 @@ class PremiumBookingTimeSelector extends ConsumerWidget {
     );
     if (selected == null) return;
     var end = DateTime(
-      query.start.year,
-      query.start.month,
-      query.start.day,
+      query.end.year,
+      query.end.month,
+      query.end.day,
       selected.hour,
       selected.minute,
     );
@@ -214,6 +269,68 @@ class PremiumBookingTimeSelector extends ConsumerWidget {
     ref.read(searchProvider.notifier).range(query.start, end);
     onChanged();
   }
+}
+
+class _RangeRow extends StatelessWidget {
+  const _RangeRow({
+    required this.icon,
+    required this.title,
+    required this.date,
+    required this.time,
+    required this.onDate,
+    required this.onTime,
+  });
+
+  final IconData icon;
+  final String title;
+  final String date;
+  final String time;
+  final VoidCallback onDate;
+  final VoidCallback onTime;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: T.surfaceRaised,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: T.line),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: T.mintSoft,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon, color: T.success),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text('$date · $time', style: const TextStyle(color: T.muted)),
+                ],
+              ),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Datum ändern',
+              onPressed: onDate,
+              icon: const Icon(Icons.calendar_today_outlined),
+            ),
+            const SizedBox(width: 4),
+            IconButton.filledTonal(
+              tooltip: 'Uhrzeit ändern',
+              onPressed: onTime,
+              icon: const Icon(Icons.schedule_rounded),
+            ),
+          ],
+        ),
+      );
 }
 
 class PremiumRetryState extends StatelessWidget {
