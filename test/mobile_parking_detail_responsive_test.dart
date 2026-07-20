@@ -53,7 +53,7 @@ void main() {
 
     final title = find.text('Praxisstellplatz Bockenheim');
     expect(title, findsOneWidget);
-    expect(find.text('Sofort buchbar'), findsOneWidget);
+    expect(find.text('Sofort reservierbar'), findsOneWidget);
     expect(find.text('Verifiziert'), findsOneWidget);
     expect(tester.getSize(title).width, greaterThan(250));
     expect(tester.getSize(title).height, lessThan(120));

@@ -22,7 +22,7 @@ void main() {
   test('parking compatibility logic works', () {
     final space = DemoParkingRepository.spaces.first;
     expect(space.fits(demoVehicles.first), isTrue);
-    expect(space.fits(demoVehicles[2]), isFalse);
+    expect(space.fits(demoVehicles.last), isFalse);
   });
 
   test('filters and sorting update results', () {

@@ -41,7 +41,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -e '.[test]'
       - run: ruff check app tests
-      - run: alembic upgrade head
+      - run: alembic upgrade heads
       - run: python -m app.db.seed && python -m app.db.seed
       - run: pytest
       - name: Build backend image

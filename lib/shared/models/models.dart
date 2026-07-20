@@ -29,6 +29,8 @@ class Vehicle {
     this.width,
     this.length,
   );
+
+  bool get hasPlate => plate.trim().isNotEmpty;
 }
 
 class ParkingSpace {
@@ -95,6 +97,8 @@ class ParkingSpace {
   bool get outdoor => !indoor;
   bool get free => hourlyPrice <= 0;
 
+  // Legacy approximation helpers remain for older, non-routed screens. The
+  // production discovery v2 UI never displays these values.
   double distanceMetersTo(Destination? destination) {
     if (destination == null) return walkingMeters.toDouble();
     const earthRadius = 6371000.0;
@@ -108,8 +112,6 @@ class ParkingSpace {
             math.sin(deltaLng / 2) *
             math.sin(deltaLng / 2);
     final airDistance = earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    // A conservative city walking factor avoids presenting straight-line distance
-    // as an exact route while still responding to the selected destination.
     return airDistance * 1.28;
   }
 
@@ -142,7 +144,9 @@ class SearchQuery {
     this.sort = 'Empfohlen',
   });
 
-  int get hours => end.difference(start).inHours.clamp(1, 24);
+  int get hours => math.max(1, (end.difference(start).inMinutes + 59) ~/ 60);
+
+  Duration get duration => end.difference(start);
 
   bool get valid =>
       destination != null && vehicle != null && end.isAfter(start);
@@ -165,7 +169,24 @@ class SearchQuery {
       );
 
   String summary() {
-    return '${destination?.name ?? 'Wohin möchtest du?'} · ${_dateLabel(start)} · ${_time(start)}–${_time(end)} · ${vehicle?.name ?? 'Fahrzeug wählen'}';
+    final sameDay = start.year == end.year &&
+        start.month == end.month &&
+        start.day == end.day;
+    final timeRange = sameDay
+        ? '${_dateLabel(start)} · ${_time(start)}–${_time(end)}'
+        : '${_dateLabel(start)} ${_time(start)} – ${_dateLabel(end)} ${_time(end)}';
+    return '${destination?.name ?? 'Wohin möchtest du?'} · $timeRange · ${vehicle?.name ?? 'Fahrzeug wählen'}';
+  }
+
+  String durationLabel() {
+    final minutes = duration.inMinutes;
+    final days = minutes ~/ (24 * 60);
+    final remainingHours = (minutes % (24 * 60) / 60).ceil();
+    if (days > 0 && remainingHours > 0) {
+      return '$days ${days == 1 ? 'Tag' : 'Tage'} · $remainingHours Std.';
+    }
+    if (days > 0) return '$days ${days == 1 ? 'Tag' : 'Tage'}';
+    return '$hours ${hours == 1 ? 'Stunde' : 'Stunden'}';
   }
 
   static String _time(DateTime value) {

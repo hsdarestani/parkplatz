@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/models/models.dart';
-import '../data/demo_search_data.dart';
 
 final searchProvider =
     StateNotifierProvider<SearchController, SearchQuery>((ref) {
@@ -22,7 +21,6 @@ class SearchController extends StateNotifier<SearchQuery> {
     return SearchQuery(
       start: rounded,
       end: rounded.add(const Duration(hours: 2)),
-      vehicle: demoVehicles.first,
     );
   }
 
@@ -45,14 +43,24 @@ class SearchController extends StateNotifier<SearchQuery> {
   }
 
   void duration(int hours) {
+    final safeHours = hours.clamp(1, 24 * 30);
+    state = state.copyWith(end: state.start.add(Duration(hours: safeHours)));
+  }
+
+  void durationValue(Duration value) {
+    final minutes = value.inMinutes.clamp(60, 24 * 30 * 60);
     state = state.copyWith(
-      end: state.start.add(Duration(hours: hours.clamp(1, 24))),
+      end: state.start.add(Duration(minutes: minutes)),
     );
   }
 
   void range(DateTime start, DateTime end) {
     if (!end.isAfter(start)) return;
-    state = state.copyWith(start: start, end: end);
+    final maximum = start.add(const Duration(days: 30));
+    state = state.copyWith(
+      start: start,
+      end: end.isAfter(maximum) ? maximum : end,
+    );
   }
 
   void toggle(String filter) {

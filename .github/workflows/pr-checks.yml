@@ -1,0 +1,123 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parkplatz-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: freiraum
+          POSTGRES_USER: freiraum
+          POSTGRES_PASSWORD: freiraum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U freiraum" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+psycopg://freiraum:freiraum@localhost:5432/freiraum
+      JWT_SECRET: pull-request-only-secret
+      PAYMENT_MODE: direct
+      PUBLIC_APP_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[test]'
+      - run: ruff check app tests
+      - name: Run database migrations
+        run: |
+          set +e
+          alembic upgrade heads 2>&1 | tee ../alembic-upgrade.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload migration diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-migration-diagnostics
+          path: alembic-upgrade.log
+          if-no-files-found: error
+      - run: python -m app.db.seed && python -m app.db.seed
+      - name: Run backend tests
+        run: |
+          set +e
+          pytest 2>&1 | tee ../pytest.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload pytest diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pytest-diagnostics
+          path: pytest.log
+          if-no-files-found: error
+      - name: Build backend image
+        working-directory: .
+        run: docker build -t freiraum-api-pr:${GITHUB_SHA} backend
+
+  flutter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - name: Resolve Flutter dependencies
+        run: |
+          set +e
+          flutter pub get 2>&1 | tee flutter-pub-get.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload dependency diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-dependency-diagnostics
+          path: flutter-pub-get.log
+          if-no-files-found: error
+      - run: dart format --output=none lib test
+      - name: Analyze Flutter
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee flutter-analyze.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload analyzer diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-analyzer-diagnostics
+          path: flutter-analyze.log
+          if-no-files-found: error
+      - name: Run Flutter tests
+        run: |
+          set +e
+          flutter test 2>&1 | tee flutter-test.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload Flutter test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-test-diagnostics
+          path: flutter-test.log
+          if-no-files-found: error
+      - name: Build Flutter Web
+        run: >-
+          flutter build web --release --base-href / --pwa-strategy=none
+          --dart-define=API_BASE_URL=/api
+          --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false

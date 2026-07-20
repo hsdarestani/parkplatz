@@ -13,6 +13,7 @@ from app.schemas.api import BookingIn
 from app.services.availability import evaluate_availability
 
 FRANKFURT_TIMEZONE = ZoneInfo("Europe/Berlin")
+MAX_BOOKING_HOURS = 24 * 30
 
 
 def normalize_booking_time(value: datetime) -> datetime:
@@ -68,12 +69,12 @@ class BookingService:
             )
 
         duration_hours = (end_at - start_at).total_seconds() / 3600
-        if duration_hours < 1 or duration_hours > 24:
+        if duration_hours < 1 or duration_hours > MAX_BOOKING_HOURS:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
                     "code": "invalid_duration",
-                    "message": "Buchungen sind zwischen 1 und 24 Stunden möglich.",
+                    "message": "Buchungen sind zwischen 1 Stunde und 30 Tagen möglich.",
                 },
             )
 
