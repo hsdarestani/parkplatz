@@ -117,75 +117,94 @@ class DirectPaymentService:
                 },
             )
 
-        destination = await db.get(
-            HostDirectPaymentSettings,
-            parking_space.owner_id,
-        )
-        if destination is None or not destination.enabled:
-            await BookingService.expire_pending(
-                db,
-                booking,
-                reason="host_payment_not_ready",
+        free_booking = booking.total_price_cents == 0
+        destination = None
+        if not free_booking:
+            destination = await db.get(
+                HostDirectPaymentSettings,
+                parking_space.owner_id,
             )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "host_payment_not_ready",
-                    "message": (
-                        "Dieser Anbieter hat noch keine direkte Zahlungsmethode "
-                        "hinterlegt."
-                    ),
-                },
-            )
+            if destination is None or not destination.enabled:
+                await BookingService.expire_pending(
+                    db,
+                    booking,
+                    reason="host_payment_not_ready",
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "host_payment_not_ready",
+                        "message": (
+                            "Dieser Anbieter hat noch keine direkte Zahlungsmethode "
+                            "hinterlegt."
+                        ),
+                    },
+                )
 
         existing = await db.scalar(
             select(Payment).where(Payment.booking_id == booking.id)
         )
         if existing is not None and existing.provider == "direct":
-            return {
+            result = {
                 "requires_redirect": False,
                 "booking_id": str(booking.id),
                 "payment": payment_out(existing),
-                "direct_payment": direct_instructions(destination, booking),
             }
+            if destination is not None:
+                result["direct_payment"] = direct_instructions(destination, booking)
+            return result
 
-        expires_at = datetime.now(timezone.utc) + timedelta(
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(
             hours=max(settings.direct_payment_hold_hours, 1)
+        )
+        initial_status = (
+            "awaiting_host_confirmation" if free_booking else "awaiting_payment"
         )
         payment = existing or Payment(
             booking_id=booking.id,
             payer_user_id=user_id,
             host_user_id=parking_space.owner_id,
             provider="direct",
-            status="awaiting_payment",
+            status=initial_status,
             amount_cents=booking.total_price_cents,
             platform_fee_cents=0,
             host_net_cents=booking.total_price_cents,
             currency=booking.currency,
         )
         payment.provider = "direct"
-        payment.status = "awaiting_payment"
+        payment.status = initial_status
         payment.amount_cents = booking.total_price_cents
         payment.platform_fee_cents = 0
         payment.host_net_cents = booking.total_price_cents
         payment.currency = booking.currency
-        payment.payment_method = destination.method
-        payment.checkout_url = destination.payment_url
+        payment.payment_method = "free" if free_booking else destination.method
+        payment.checkout_url = None if free_booking else destination.payment_url
         payment.expires_at = expires_at
-        payment.payer_reference = None
-        payment.submitted_at = None
+        payment.payer_reference = booking.public_reference if free_booking else None
+        payment.submitted_at = now if free_booking else None
         payment.host_confirmed_at = None
         payment.rejected_at = None
         payment.failure_message = None
         db.add(payment)
+        if free_booking:
+            db.add(
+                BookingEvent(
+                    booking_id=booking.id,
+                    event_type="free_booking_submitted",
+                    event_metadata={"reference": booking.public_reference},
+                )
+            )
         await db.commit()
         await db.refresh(payment)
-        return {
+        result = {
             "requires_redirect": False,
             "booking_id": str(booking.id),
             "payment": payment_out(payment),
-            "direct_payment": direct_instructions(destination, booking),
         }
+        if destination is not None:
+            result["direct_payment"] = direct_instructions(destination, booking)
+        return result
 
     @staticmethod
     async def submit_reference(
@@ -322,7 +341,7 @@ class DirectPaymentService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "payment_already_decided",
-                    "message": "Diese Zahlung wurde bereits bearbeitet.",
+                    "message": "Diese Anfrage wurde bereits bearbeitet.",
                 },
             )
 
@@ -343,7 +362,7 @@ class DirectPaymentService:
             payment.failure_message = (
                 data.reason.strip()
                 if data.reason
-                else "Zahlung vom Anbieter nicht bestätigt."
+                else "Anfrage vom Anbieter nicht bestätigt."
             )
             db.add(
                 BookingEvent(
