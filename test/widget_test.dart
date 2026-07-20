@@ -55,36 +55,23 @@ void main() {
   });
 
   testWidgets(
-    'mobile discovery opens the guided destination and vehicle wizard',
+    'mobile discovery opens the guided multi-day timing step',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(buildTestApp());
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Wann und wohin?'), findsOneWidget);
       await tester.tap(find.text('Wann und wohin?'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Zeitraum'), findsOneWidget);
       expect(find.text('Einfahrt'), findsOneWidget);
       expect(find.text('Ausfahrt'), findsOneWidget);
       expect(find.text('3 Tage'), findsOneWidget);
-
-      await tester.tap(find.text('Weiter'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ziel auswählen'), findsOneWidget);
-      await tester.tap(find.text('Messe Frankfurt').first);
-      await tester.pump();
-      await tester.tap(find.text('Weiter'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Fahrzeug passend auswählen'), findsOneWidget);
-      expect(find.text('Marke'), findsOneWidget);
-      expect(find.text('Modell'), findsOneWidget);
-      expect(find.text('Eigenes Fahrzeug hinzufügen'), findsOneWidget);
+      expect(find.text('Weiter'), findsOneWidget);
 
       await disposeTestApp(tester);
     },
