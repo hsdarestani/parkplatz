@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../../../config/design_tokens.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/illustration.dart';
-import '../../booking/data/repositories.dart';
 import '../../favorites/data/favorites_repository.dart';
 
 class ParkingCard extends ConsumerWidget {
@@ -32,6 +31,8 @@ class ParkingCard extends ConsumerWidget {
     final favorite = ref.watch(favoritesProvider).contains(s.id);
     final currency = NumberFormat.currency(locale: 'de_DE', symbol: '€');
     final fits = q.vehicle == null || s.fits(q.vehicle!);
+    final walking = s.walkingLabel(q.destination);
+    final total = s.free ? 'Kostenlos' : '${currency.format(s.total(q.hours))} gesamt';
 
     Future<void> toggle() async {
       await ref.read(favoritesProvider.notifier).toggle(s.id);
@@ -74,8 +75,8 @@ class ParkingCard extends ConsumerWidget {
                 children: [
                   ParkingIllustration(
                     s.visual,
-                    width: compact ? 94 : 112,
-                    height: compact ? 74 : 86,
+                    width: compact ? 90 : 108,
+                    height: compact ? 72 : 84,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -94,6 +95,7 @@ class ParkingCard extends ConsumerWidget {
                             ),
                             IconButton(
                               tooltip: favorite ? 'Entfernen' : 'Merken',
+                              visualDensity: VisualDensity.compact,
                               onPressed: toggle,
                               icon: Icon(
                                 favorite
@@ -106,16 +108,30 @@ class ParkingCard extends ConsumerWidget {
                         ),
                         Text(
                           s.approximate(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: T.muted),
                         ),
                         const SizedBox(height: 8),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
+                          spacing: 7,
+                          runSpacing: 7,
                           children: [
-                            _Tag('${s.walkingMinutes} Min.'),
-                            _Tag(fits ? 'Fahrzeug passt' : 'Maße prüfen'),
-                            _Tag(s.accessLabel()),
+                            _Tag(
+                              icon: Icons.directions_walk_rounded,
+                              text: walking,
+                            ),
+                            _Tag(
+                              icon: fits
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.straighten_rounded,
+                              text: fits ? 'Fahrzeug passt' : 'Maße prüfen',
+                              positive: fits,
+                            ),
+                            _Tag(
+                              icon: _accessIcon(s.access),
+                              text: s.accessLabel(),
+                            ),
                           ],
                         ),
                       ],
@@ -127,41 +143,79 @@ class ParkingCard extends ConsumerWidget {
               Row(
                 children: [
                   Text(
-                    '${currency.format(s.total(q.hours))} gesamt',
-                    style: const TextStyle(
+                    total,
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
+                      color: s.free ? T.success : T.ink,
                     ),
                   ),
+                  if (!s.free) ...[
+                    const SizedBox(width: 7),
+                    Text(
+                      '${currency.format(s.hourlyPrice)}/Std.',
+                      style: const TextStyle(
+                        color: T.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   const Icon(Icons.star_rounded, color: T.amber, size: 18),
                   Text(
-                    '${s.rating.toStringAsFixed(1)} (${s.reviewCount})',
+                    s.reviewCount == 0
+                        ? 'Neu'
+                        : '${s.rating.toStringAsFixed(1)} (${s.reviewCount})',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
               if (selected) ...[
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: onDetails,
-                        child: const Text('Details ansehen'),
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: T.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: T.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.push_pin_outlined, size: 18, color: T.success),
+                          SizedBox(width: 7),
+                          Text(
+                            'Ausgewählt und oben angepinnt',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      onPressed: toggle,
-                      icon: Icon(
-                        favorite
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_outline_rounded,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: onDetails,
+                              icon: const Icon(Icons.info_outline_rounded),
+                              label: const Text('Details ansehen'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          OutlinedButton.icon(
+                            onPressed: toggle,
+                            icon: Icon(
+                              favorite
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_outline_rounded,
+                            ),
+                            label: Text(favorite ? 'Gemerkt' : 'Merken'),
+                          ),
+                        ],
                       ),
-                      label: Text(favorite ? 'Gemerkt' : 'Merken'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -172,22 +226,43 @@ class ParkingCard extends ConsumerWidget {
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag(this.text);
+IconData _accessIcon(AccessType access) => switch (access) {
+      AccessType.offen => Icons.wb_sunny_outlined,
+      AccessType.schranke => Icons.horizontal_rule_rounded,
+      AccessType.tor => Icons.fence_outlined,
+      AccessType.tiefgarage => Icons.garage_outlined,
+      AccessType.rezeption => Icons.meeting_room_outlined,
+    };
 
+class _Tag extends StatelessWidget {
+  const _Tag({
+    required this.icon,
+    required this.text,
+    this.positive = false,
+  });
+
+  final IconData icon;
   final String text;
+  final bool positive;
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          color: T.porcelain,
+          color: positive ? T.mintSoft : T.porcelain,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: T.line),
+          border: Border.all(color: positive ? T.mint : T.line),
         ),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: positive ? T.success : T.muted),
+            const SizedBox(width: 4),
+            Text(
+              text,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          ],
         ),
       );
 }
