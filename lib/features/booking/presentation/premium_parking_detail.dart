@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/models/models.dart';
 import '../../../shared/widgets/freiraum_scaffold.dart';
 import '../../host/data/host_repository.dart';
 import '../../parking/data/providers.dart';
@@ -69,7 +70,7 @@ class _DetailContent extends StatelessWidget {
     required this.checkingOwner,
   });
 
-  final dynamic space;
+  final ParkingSpace space;
   final bool owner;
   final bool checkingOwner;
 
