@@ -38,12 +38,16 @@ def _parking_space() -> ParkingSpace:
     )
 
 
-def test_host_listing_schema_rejects_invalid_price() -> None:
-    data = _listing_data()
-    data["hourly_price_cents"] = 0
+def test_host_listing_schema_accepts_free_but_rejects_negative_price() -> None:
+    free_data = _listing_data()
+    free_data["hourly_price_cents"] = 0
 
+    assert HostParkingSpaceIn(**free_data).hourly_price_cents == 0
+
+    invalid_data = _listing_data()
+    invalid_data["hourly_price_cents"] = -1
     with pytest.raises(ValidationError):
-        HostParkingSpaceIn(**data)
+        HostParkingSpaceIn(**invalid_data)
 
 
 def test_public_listing_hides_exact_address() -> None:
