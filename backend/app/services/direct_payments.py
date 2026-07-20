@@ -24,7 +24,9 @@ from app.schemas.direct_payment import (
     DirectPaymentSettingsIn,
 )
 from app.services.booking import BookingService
+from app.services.notifications import queue_email
 from app.services.payments import payment_out
+from app.services.subscriptions import confirmation_hours
 
 
 def direct_settings_out(value: HostDirectPaymentSettings | None) -> dict[str, Any]:
@@ -187,7 +189,10 @@ class DirectPaymentService:
         payment.rejected_at = None
         payment.failure_message = None
         db.add(payment)
+
         if free_booking:
+            response_hours = await confirmation_hours(db, parking_space.owner_id)
+            payment.host_response_due_at = now + timedelta(hours=response_hours)
             db.add(
                 BookingEvent(
                     booking_id=booking.id,
@@ -195,6 +200,35 @@ class DirectPaymentService:
                     event_metadata={"reference": booking.public_reference},
                 )
             )
+            await db.flush()
+            renter = await db.get(User, user_id)
+            host = await db.get(User, parking_space.owner_id)
+            payload = {
+                "reference": booking.public_reference,
+                "parking_title": parking_space.title,
+                "amount": f"0.00 {booking.currency}",
+                "payer_reference": booking.public_reference,
+                "due_at": payment.host_response_due_at.isoformat(),
+            }
+            if host is not None:
+                await queue_email(
+                    db,
+                    user_id=host.id,
+                    recipient=host.email,
+                    event_type="direct_payment_submitted_host",
+                    deduplication_key=f"free-booking-host:{payment.id}",
+                    payload=payload,
+                )
+            if renter is not None:
+                await queue_email(
+                    db,
+                    user_id=renter.id,
+                    recipient=renter.email,
+                    event_type="direct_payment_submitted_renter",
+                    deduplication_key=f"free-booking-renter:{payment.id}",
+                    payload=payload,
+                )
+
         await db.commit()
         await db.refresh(payment)
         result = {
@@ -308,6 +342,7 @@ class DirectPaymentService:
                 "payment_method": payment.payment_method,
                 "payer_reference": payment.payer_reference,
                 "submitted_at": payment.submitted_at,
+                "host_response_due_at": payment.host_response_due_at,
             }
             for payment, booking, parking_space, renter, vehicle in rows
         ]
