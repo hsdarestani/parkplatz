@@ -43,7 +43,7 @@ jobs:
       - name: Run database migrations
         run: |
           set +e
-          alembic upgrade head 2>&1 | tee ../alembic-upgrade.log
+          alembic upgrade heads 2>&1 | tee ../alembic-upgrade.log
           exit ${PIPESTATUS[0]}
       - name: Upload migration diagnostics
         if: failure()
