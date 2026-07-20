@@ -12,6 +12,7 @@ from app.api.marketplace_routes import router as marketplace_router
 from app.api.payment_routes import router as payment_router
 from app.api.profile_media_routes import router as profile_router
 from app.api.routes import router
+from app.api.routing_routes import router as routing_router
 from app.api.trust_routes import router as trust_router
 from app.core.config import settings
 from app.core.security import decode
@@ -28,6 +29,7 @@ app.include_router(trust_router)
 app.include_router(account_router)
 app.include_router(marketplace_router)
 app.include_router(profile_router)
+app.include_router(routing_router)
 
 _media_root = Path(settings.marketplace_upload_dir)
 _media_root.mkdir(parents=True, exist_ok=True)
