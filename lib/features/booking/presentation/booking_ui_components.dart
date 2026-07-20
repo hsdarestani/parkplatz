@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/design_tokens.dart';
 import '../../../shared/widgets/freiraum_motion.dart';
-import 'booking_screens.dart' as legacy;
+import '../../search/presentation/search_controller.dart';
 
 class BookingSurfaceCard extends StatelessWidget {
   const BookingSurfaceCard({
@@ -73,7 +74,7 @@ class BookingSectionTitle extends StatelessWidget {
       );
 }
 
-class PremiumBookingTimeSelector extends StatefulWidget {
+class PremiumBookingTimeSelector extends ConsumerWidget {
   const PremiumBookingTimeSelector({
     super.key,
     required this.onChanged,
@@ -82,108 +83,136 @@ class PremiumBookingTimeSelector extends StatefulWidget {
   final VoidCallback onChanged;
 
   @override
-  State<PremiumBookingTimeSelector> createState() =>
-      _PremiumBookingTimeSelectorState();
-}
-
-class _PremiumBookingTimeSelectorState
-    extends State<PremiumBookingTimeSelector> {
-  static const hours = [8, 10, 12, 14, 16, 18, 20];
-
-  @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final query = ref.watch(searchProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _pickDate(context, ref),
+              icon: const Icon(Icons.calendar_today_outlined),
+              label: Text(bookingDateOnly(query.start)),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _pickStartTime(context, ref),
+              icon: const Icon(Icons.login_rounded),
+              label: Text('Einfahrt ${bookingTime(query.start)}'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _pickEndTime(context, ref),
+              icon: const Icon(Icons.logout_rounded),
+              label: Text('Ausfahrt ${bookingTime(query.end)}'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const Icon(Icons.timelapse_outlined, color: T.success),
+            const SizedBox(width: 9),
+            Text(
+              '${query.hours} ${query.hours == 1 ? 'Stunde' : 'Stunden'}',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+        Slider(
+          value: query.hours.toDouble(),
+          min: 1,
+          max: 24,
+          divisions: 23,
+          label: '${query.hours} Std.',
+          onChanged: (value) {
+            ref.read(searchProvider.notifier).duration(value.round());
+            onChanged();
+          },
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: T.mintSoft,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _pickDate,
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  label: Text(bookingDateOnly(legacy.selectedStart)),
-                ),
-              ),
+              const Icon(Icons.event_available_outlined, color: T.success),
               const SizedBox(width: 10),
               Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: legacy.selectedStart.hour,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.schedule_outlined),
-                    labelText: 'Beginn',
-                  ),
-                  items: hours
-                      .map(
-                        (hour) => DropdownMenuItem(
-                          value: hour,
-                          child: Text('${hour.toString().padLeft(2, '0')}:00'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (hour) {
-                    if (hour == null) return;
-                    setState(() {
-                      legacy.selectedStart = DateTime(
-                        legacy.selectedStart.year,
-                        legacy.selectedStart.month,
-                        legacy.selectedStart.day,
-                        hour,
-                      );
-                      legacy.selectedEnd = legacy.selectedStart.add(
-                        const Duration(hours: 2),
-                      );
-                    });
-                    widget.onChanged();
-                  },
+                child: Text(
+                  '${bookingDateTime(query.start)} bis ${bookingTime(query.end)} Uhr',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: T.mintSoft,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.timelapse_outlined, color: T.success),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${bookingDateTime(legacy.selectedStart)} bis ${bookingTime(legacy.selectedEnd)} Uhr',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickDate(BuildContext context, WidgetRef ref) async {
+    final query = ref.read(searchProvider);
     final today = DateTime.now();
-    final initial = legacy.selectedStart.isBefore(today)
-        ? today.add(const Duration(days: 1))
-        : legacy.selectedStart;
+    final initial = query.start.isBefore(today) ? today : query.start;
     final date = await showDatePicker(
       context: context,
       firstDate: today,
-      lastDate: today.add(const Duration(days: 90)),
+      lastDate: today.add(const Duration(days: 365)),
       initialDate: initial,
     );
     if (date == null) return;
-    setState(() {
-      legacy.selectedStart = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        legacy.selectedStart.hour,
-      );
-      legacy.selectedEnd = legacy.selectedStart.add(
-        const Duration(hours: 2),
-      );
-    });
-    widget.onChanged();
+    ref.read(searchProvider.notifier).start(
+          DateTime(
+            date.year,
+            date.month,
+            date.day,
+            query.start.hour,
+            query.start.minute,
+          ),
+        );
+    onChanged();
+  }
+
+  Future<void> _pickStartTime(BuildContext context, WidgetRef ref) async {
+    final query = ref.read(searchProvider);
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(query.start),
+    );
+    if (selected == null) return;
+    ref.read(searchProvider.notifier).start(
+          DateTime(
+            query.start.year,
+            query.start.month,
+            query.start.day,
+            selected.hour,
+            selected.minute,
+          ),
+        );
+    onChanged();
+  }
+
+  Future<void> _pickEndTime(BuildContext context, WidgetRef ref) async {
+    final query = ref.read(searchProvider);
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(query.end),
+    );
+    if (selected == null) return;
+    var end = DateTime(
+      query.start.year,
+      query.start.month,
+      query.start.day,
+      selected.hour,
+      selected.minute,
+    );
+    if (!end.isAfter(query.start)) end = end.add(const Duration(days: 1));
+    ref.read(searchProvider.notifier).range(query.start, end);
+    onChanged();
   }
 }
 
