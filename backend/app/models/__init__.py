@@ -15,6 +15,7 @@ from .base import (
     ParkingSpace,
     ParkingSpaceImage,
     RefreshToken,
+    Review,
     User,
     Vehicle,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "Payment",
     "PaymentWebhookEvent",
     "RefreshToken",
+    "Review",
     "SafetyReport",
     "User",
     "Vehicle",
