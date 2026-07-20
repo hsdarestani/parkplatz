@@ -1,10 +1,14 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 
 from app.api.account_routes import router as account_router
 from app.api.host_schedule_routes import router as host_schedule_router
 from app.api.launch_routes import router as launch_router
+from app.api.marketplace_routes import router as marketplace_router
 from app.api.payment_routes import router as payment_router
 from app.api.routes import router
 from app.api.trust_routes import router as trust_router
@@ -14,13 +18,18 @@ from app.db.session import Session
 from app.models import ParkingSpace
 from app.services.subscriptions import plan_limits, subscription_for
 
-app = FastAPI(title="FREIRAUM API", version="0.1.0")
+app = FastAPI(title="FREIRAUM API", version=settings.version)
 app.include_router(router)
 app.include_router(host_schedule_router)
 app.include_router(payment_router)
 app.include_router(launch_router)
 app.include_router(trust_router)
 app.include_router(account_router)
+app.include_router(marketplace_router)
+
+_media_root = Path(settings.marketplace_upload_dir)
+_media_root.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(_media_root)), name="marketplace-media")
 
 
 @app.middleware("http")
