@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/freiraum_scaffold.dart';
 import '../../booking/data/repositories.dart';
 import '../../host/data/host_repository.dart';
+import '../../marketplace/data/marketplace_repository.dart';
 import '../../parking/data/providers.dart';
 import '../data/profile_repository.dart';
 
@@ -19,6 +21,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late Future<_Snapshot> future;
+  bool uploadingPhoto = false;
 
   @override
   void initState() {
@@ -48,10 +51,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         actions: [
           IconButton(
             tooltip: 'Abmelden',
-            onPressed: () async {
-              await ref.read(authRepositoryProvider).logout();
-              if (context.mounted) context.go('/login');
-            },
+            onPressed: _logout,
             icon: const Icon(Icons.logout_rounded),
           ),
         ],
@@ -90,65 +90,128 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.all(26),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [T.ink, T.inkSoft],
-                  ),
+                  gradient: const LinearGradient(colors: [T.ink, T.inkSoft]),
                   borderRadius: BorderRadius.circular(T.radiusSpacious),
                   boxShadow: T.shadow,
                 ),
-                child: Wrap(
-                  spacing: 22,
-                  runSpacing: 18,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 38,
-                      backgroundColor: T.mint,
-                      foregroundColor: T.ink,
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 650;
+                    final avatar = Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircleAvatar(
+                          radius: 44,
+                          backgroundColor: T.mint,
+                          foregroundColor: T.ink,
+                          backgroundImage: snapshot.user.profileImageUrl == null
+                              ? null
+                              : NetworkImage(snapshot.user.profileImageUrl!),
+                          child: snapshot.user.profileImageUrl == null
+                              ? Text(
+                                  initial,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                )
+                              : null,
                         ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 430,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        Positioned(
+                          right: -6,
+                          bottom: -6,
+                          child: IconButton.filled(
+                            tooltip: 'Profilbild ändern',
+                            onPressed: uploadingPhoto ? null : _pickProfilePhoto,
+                            icon: uploadingPhoto
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.photo_camera_outlined),
+                          ),
+                        ),
+                      ],
+                    );
+                    final identity = Column(
+                      crossAxisAlignment: compact
+                          ? CrossAxisAlignment.center
+                          : CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          snapshot.user.displayName,
+                          textAlign: compact ? TextAlign.center : TextAlign.start,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          snapshot.user.email,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 8),
+                        const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_user_outlined, color: T.mint, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Live-Konto',
+                              style: TextStyle(
+                                color: T.mint,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                    final actions = Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: compact ? WrapAlignment.center : WrapAlignment.end,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () => _editName(snapshot.user),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Name bearbeiten'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _logout,
+                          icon: const Icon(Icons.logout_rounded),
+                          label: const Text('Abmelden'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white38),
+                          ),
+                        ),
+                      ],
+                    );
+                    if (compact) {
+                      return Column(
                         children: [
-                          Text(
-                            snapshot.user.displayName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Text(
-                            snapshot.user.email,
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            '● Live-Konto',
-                            style: TextStyle(
-                              color: T.mint,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                          avatar,
+                          const SizedBox(height: 18),
+                          identity,
+                          const SizedBox(height: 18),
+                          actions,
                         ],
-                      ),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _editName(snapshot.user),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Name bearbeiten'),
-                    ),
-                  ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        avatar,
+                        const SizedBox(width: 24),
+                        Expanded(child: identity),
+                        actions,
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 20),
@@ -174,29 +237,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 28),
-              Text(
-                'Schnellzugriff',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Schnellzugriff', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
+              _ActionTile(
+                icon: Icons.search_rounded,
+                title: 'Stellplatz suchen',
+                subtitle: 'Datum, Uhrzeit und Fahrzeug auswählen',
+                onTap: () => context.go('/discover'),
+              ),
               _ActionTile(
                 icon: Icons.calendar_month_outlined,
                 title: 'Meine Buchungen',
-                subtitle: 'Reservierungen und Parking Pass verwalten',
+                subtitle: 'Reservierungen, Bewertungen und Parking Pass',
                 onTap: () => context.go('/bookings'),
               ),
               _ActionTile(
                 icon: Icons.directions_car_filled_outlined,
                 title: 'Meine Fahrzeuge',
-                subtitle: 'Kennzeichen und Fahrzeugmaße verwalten',
+                subtitle: 'Kennzeichen, Fahrzeugklasse und Maße verwalten',
                 onTap: () => context.go('/vehicles'),
               ),
               _ActionTile(
                 icon: Icons.add_home_work_outlined,
                 title: 'Stellplatz vermieten',
-                subtitle: 'Neuen Stellplatz hinzufügen oder pausieren',
+                subtitle: 'Adresse, Pin, Ausstattung und Fotos verwalten',
                 highlighted: true,
                 onTap: () => context.go('/host'),
+              ),
+              _ActionTile(
+                icon: Icons.bookmark_outline_rounded,
+                title: 'Gemerkte Stellplätze',
+                subtitle: 'Gespeicherte Favoriten öffnen',
+                onTap: () => context.go('/favorites'),
               ),
               _ActionTile(
                 icon: Icons.verified_user_outlined,
@@ -210,6 +282,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 subtitle: 'Datenschutz, Bedingungen und Impressum öffnen',
                 onTap: () => context.go('/legal/privacy'),
               ),
+              _ActionTile(
+                icon: Icons.logout_rounded,
+                title: 'Abmelden',
+                subtitle: 'Aktuelle Sitzung beenden',
+                onTap: _logout,
+              ),
             ],
           ),
         ),
@@ -217,7 +295,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Future<void> _editName(AppUser user) async {
+  Future<void> _pickProfilePhoto() async {
+    final selection = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+      allowMultiple: false,
+    );
+    final file = selection?.files.single;
+    if (file?.bytes == null) return;
+    setState(() => uploadingPhoto = true);
+    try {
+      await ref
+          .read(marketplaceRepositoryProvider)
+          .uploadProfileImage(file!.bytes!, file.name);
+      reload();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => uploadingPhoto = false);
+    }
+  }
+
+  Future<void> _editName(ProfileUser user) async {
     final controller = TextEditingController(text: user.displayName);
     final changed = await showDialog<String>(
       context: context,
@@ -226,19 +329,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: const InputDecoration(
+            labelText: 'Name',
+            prefixIcon: Icon(Icons.person_outline_rounded),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Abbrechen'),
           ),
-          FilledButton(
+          FilledButton.icon(
             onPressed: () {
               final value = controller.text.trim();
               if (value.length >= 2) Navigator.pop(dialogContext, value);
             },
-            child: const Text('Speichern'),
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Speichern'),
           ),
         ],
       ),
@@ -256,23 +363,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     }
   }
+
+  Future<void> _logout() async {
+    await ref.read(authRepositoryProvider).logout();
+    if (mounted) context.go('/login');
+  }
 }
 
 class _Snapshot {
   const _Snapshot(this.user, this.vehicles, this.bookings, this.spaces);
 
-  final AppUser user;
+  final ProfileUser user;
   final List<VehicleRecord> vehicles;
   final List<BookingRecord> bookings;
   final List<HostSpaceRecord> spaces;
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({
-    required this.value,
-    required this.label,
-    required this.icon,
-  });
+  const _Metric({required this.value, required this.label, required this.icon});
 
   final String value;
   final String label;
@@ -297,10 +405,7 @@ class _Metric extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                 ),
                 Text(label, style: const TextStyle(color: T.muted)),
               ],
@@ -338,9 +443,7 @@ class _ActionTile extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(T.radius),
-                border: Border.all(
-                  color: highlighted ? T.mint : T.line,
-                ),
+                border: Border.all(color: highlighted ? T.mint : T.line),
               ),
               child: Row(
                 children: [
@@ -385,7 +488,7 @@ class _ErrorState extends StatelessWidget {
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               label: const Text('Erneut versuchen'),
             ),
           ],
