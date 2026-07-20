@@ -1,0 +1,68 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parkplatz-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: freiraum
+          POSTGRES_USER: freiraum
+          POSTGRES_PASSWORD: freiraum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U freiraum" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+psycopg://freiraum:freiraum@localhost:5432/freiraum
+      JWT_SECRET: pull-request-only-secret
+      PAYMENT_MODE: direct
+      PUBLIC_APP_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[test]'
+      - run: ruff check app tests
+      - run: alembic upgrade head
+      - run: python -m app.db.seed && python -m app.db.seed
+      - run: pytest
+      - name: Build backend image
+        working-directory: .
+        run: docker build -t freiraum-api-pr:${GITHUB_SHA} backend
+
+  flutter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+      - name: Build Flutter Web
+        run: >-
+          flutter build web --release --base-href / --pwa-strategy=none
+          --dart-define=API_BASE_URL=/api
+          --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
