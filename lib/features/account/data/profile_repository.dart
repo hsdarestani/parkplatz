@@ -1,12 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/media_url.dart';
 import '../../booking/data/repositories.dart';
 import '../../parking/data/providers.dart';
 
+class ProfileUser {
+  const ProfileUser({
+    required this.id,
+    required this.email,
+    required this.displayName,
+    this.profileImageUrl,
+  });
+
+  final String id;
+  final String email;
+  final String displayName;
+  final String? profileImageUrl;
+
+  factory ProfileUser.fromJson(Map<String, dynamic> json) => ProfileUser(
+        id: json['id'].toString(),
+        email: json['email'] as String,
+        displayName: json['display_name'] as String,
+        profileImageUrl: json['profile_image_url'] == null
+            ? null
+            : resolveMediaUrl(json['profile_image_url'].toString()),
+      );
+}
+
 abstract interface class ProfileRepository {
-  Future<AppUser> read();
-  Future<AppUser> updateDisplayName(String displayName);
+  Future<ProfileUser> read();
+  Future<ProfileUser> updateDisplayName(String displayName);
 }
 
 class ApiProfileRepository implements ProfileRepository {
@@ -15,18 +39,18 @@ class ApiProfileRepository implements ProfileRepository {
   final ApiClient api;
 
   @override
-  Future<AppUser> read() async => AppUser.fromJson(
-        await api.get('/auth/me') as Map<String, dynamic>,
+  Future<ProfileUser> read() async => ProfileUser.fromJson(
+        await api.get('/auth/me/profile') as Map<String, dynamic>,
       );
 
   @override
-  Future<AppUser> updateDisplayName(String displayName) async =>
-      AppUser.fromJson(
-        await api.patch(
-          '/auth/me',
-          body: {'display_name': displayName.trim()},
-        ) as Map<String, dynamic>,
-      );
+  Future<ProfileUser> updateDisplayName(String displayName) async {
+    await api.patch(
+      '/auth/me',
+      body: {'display_name': displayName.trim()},
+    );
+    return read();
+  }
 }
 
 class LocalProfileRepository implements ProfileRepository {
@@ -35,23 +59,24 @@ class LocalProfileRepository implements ProfileRepository {
   final AuthRepository auth;
 
   @override
-  Future<AppUser> read() async {
+  Future<ProfileUser> read() async {
     if (!auth.authenticated) await auth.restore();
-    return auth.currentUser ??
-        const AppUser(
-          id: 'local',
-          email: 'lokal@beta',
-          displayName: 'Beta-Nutzer',
-        );
+    final user = auth.currentUser;
+    return ProfileUser(
+      id: user?.id ?? 'local',
+      email: user?.email ?? 'lokal@beta',
+      displayName: user?.displayName ?? 'Beta-Nutzer',
+    );
   }
 
   @override
-  Future<AppUser> updateDisplayName(String displayName) async {
+  Future<ProfileUser> updateDisplayName(String displayName) async {
     final user = await read();
-    return AppUser(
+    return ProfileUser(
       id: user.id,
       email: user.email,
       displayName: displayName.trim(),
+      profileImageUrl: user.profileImageUrl,
     );
   }
 }
