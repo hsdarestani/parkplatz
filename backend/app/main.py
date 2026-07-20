@@ -31,7 +31,11 @@ app.include_router(profile_router)
 
 _media_root = Path(settings.marketplace_upload_dir)
 _media_root.mkdir(parents=True, exist_ok=True)
-app.mount("/media", StaticFiles(directory=str(_media_root)), name="marketplace-media")
+app.mount(
+    "/api/media",
+    StaticFiles(directory=str(_media_root)),
+    name="marketplace-media",
+)
 
 
 @app.middleware("http")
