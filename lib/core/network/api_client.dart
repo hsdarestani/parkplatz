@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../config/environment.dart';
 
@@ -131,7 +132,12 @@ class ApiClient {
     final token = await tokens.readAccess();
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
     request.files.add(
-      http.MultipartFile.fromBytes(field, bytes, filename: filename),
+      http.MultipartFile.fromBytes(
+        field,
+        bytes,
+        filename: filename,
+        contentType: _mediaTypeFor(filename),
+      ),
     );
 
     http.Response response;
@@ -283,6 +289,17 @@ class ApiClient {
       return false;
     }
   }
+}
+
+MediaType _mediaTypeFor(String filename) {
+  final extension = filename.toLowerCase().split('.').last;
+  return switch (extension) {
+    'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
+    'png' => MediaType('image', 'png'),
+    'webp' => MediaType('image', 'webp'),
+    'pdf' => MediaType('application', 'pdf'),
+    _ => MediaType('application', 'octet-stream'),
+  };
 }
 
 String? _validationMessage(dynamic detail) {
