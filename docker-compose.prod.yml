@@ -14,7 +14,9 @@ services:
     restart: unless-stopped
     env_file: .env.production
     ports: ["127.0.0.1:8000:8000"]
-    volumes: [freiraum_uploads:/var/lib/freiraum/uploads]
+    volumes:
+      - freiraum_uploads:/var/lib/freiraum/uploads
+      - freiraum_marketplace_media:/var/lib/freiraum/marketplace-media
     depends_on:
       db:
         condition: service_healthy
@@ -34,3 +36,4 @@ services:
 volumes:
   freiraum_postgres: {}
   freiraum_uploads: {}
+  freiraum_marketplace_media: {}
