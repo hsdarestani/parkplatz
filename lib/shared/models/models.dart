@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 enum AccessType { offen, schranke, tor, tiefgarage, rezeption }
 
 enum VisualType {
@@ -82,12 +84,43 @@ class ParkingSpace {
   String approximate() => '$district · nahe $landmark';
 
   String accessLabel() => switch (access) {
-        AccessType.offen => 'offen',
-        AccessType.schranke => 'Schranke',
-        AccessType.tor => 'Tor',
-        AccessType.tiefgarage => 'Tiefgarage',
-        AccessType.rezeption => 'Rezeption',
+        AccessType.offen => 'Außen · offen',
+        AccessType.schranke => 'Außen · Schranke',
+        AccessType.tor => 'Innenhof · Tor',
+        AccessType.tiefgarage => 'Garage · innen',
+        AccessType.rezeption => 'Garage · Empfang',
       };
+
+  bool get indoor => covered || access == AccessType.tiefgarage;
+  bool get outdoor => !indoor;
+  bool get free => hourlyPrice <= 0;
+
+  double distanceMetersTo(Destination? destination) {
+    if (destination == null) return walkingMeters.toDouble();
+    const earthRadius = 6371000.0;
+    final lat1 = lat * math.pi / 180;
+    final lat2 = destination.lat * math.pi / 180;
+    final deltaLat = (destination.lat - lat) * math.pi / 180;
+    final deltaLng = (destination.lng - lng) * math.pi / 180;
+    final a = math.sin(deltaLat / 2) * math.sin(deltaLat / 2) +
+        math.cos(lat1) *
+            math.cos(lat2) *
+            math.sin(deltaLng / 2) *
+            math.sin(deltaLng / 2);
+    final airDistance = earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    // A conservative city walking factor avoids presenting straight-line distance
+    // as an exact route while still responding to the selected destination.
+    return airDistance * 1.28;
+  }
+
+  int walkingMetersTo(Destination? destination) =>
+      distanceMetersTo(destination).round();
+
+  int walkingMinutesTo(Destination? destination) =>
+      math.max(1, (distanceMetersTo(destination) / 78).ceil());
+
+  String walkingLabel(Destination? destination) =>
+      'ca. ${walkingMinutesTo(destination)} Min. zu Fuß';
 
   String dimensions() =>
       'bis ${maxHeight.toStringAsFixed(2)} m Höhe · ${maxLength.toStringAsFixed(1)} m Länge';
