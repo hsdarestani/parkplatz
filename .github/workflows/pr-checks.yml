@@ -43,19 +43,22 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install backend and audit tools
-        run: |
-          pip install -e '.[test]' pip-audit
-          pip uninstall -y freiraum-backend
+        run: pip install -e '.[test]' pip-audit
+      - name: Freeze auditable dependencies
+        run: pip freeze --exclude-editable > ../audit-requirements.txt
       - name: Record Python dependency audit
         run: |
           set +e
-          pip-audit --strict --format=json 2>&1 | tee ../pip-audit.json
+          pip-audit --strict -r ../audit-requirements.txt --format=json \
+            2>&1 | tee ../pip-audit.json
           exit 0
       - name: Upload dependency audit
         uses: actions/upload-artifact@v4
         with:
           name: backend-dependency-audit
-          path: pip-audit.json
+          path: |
+            pip-audit.json
+            audit-requirements.txt
           if-no-files-found: error
       - name: Lint backend
         run: |
@@ -138,7 +141,7 @@ jobs:
         working-directory: .
         run: docker build -t freiraum-api-pr:${GITHUB_SHA} backend
       - name: Enforce backend dependency security gate
-        run: pip-audit --strict
+        run: pip-audit --strict -r ../audit-requirements.txt
 
   flutter:
     runs-on: ubuntu-latest
