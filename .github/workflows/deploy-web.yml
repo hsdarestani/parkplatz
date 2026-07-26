@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: parkplatz-production
@@ -215,30 +216,65 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/parkplatz/"
 
       - name: Deploy backend, SMTP settings, and migrations
+        id: production_backend_deploy
+        continue-on-error: true
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         run: |
-          set -euo pipefail
-          if [[ -z "$SMTP_PASSWORD" ]]; then
-            echo "Required GitHub secret SMTP_PASSWORD is missing or empty." >&2
-            exit 1
-          fi
+          set -o pipefail
+          {
+            set -euo pipefail
+            if [[ -z "$SMTP_PASSWORD" ]]; then
+              echo "Required GitHub secret SMTP_PASSWORD is missing or empty." >&2
+              exit 1
+            fi
 
-          rsync -az -e "ssh -i ~/.ssh/parkplatz_deploy" backend ops docker-compose.prod.yml \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:/srv/parkplatz/"
+            rsync -az -e "ssh -i ~/.ssh/parkplatz_deploy" backend ops docker-compose.prod.yml \
+              "${DEPLOY_USER}@${DEPLOY_HOST}:/srv/parkplatz/"
 
-          # Transfer the password over SSH stdin into a mode-600 temporary file.
-          # It is never written to the repository or included in a command argument.
-          printf '%s' "$SMTP_PASSWORD" | ssh -i ~/.ssh/parkplatz_deploy \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            'umask 077; cat > /srv/parkplatz/.smtp-password'
+            # Transfer the password over SSH stdin into a mode-600 temporary file.
+            # It is never written to the repository or included in a command argument.
+            printf '%s' "$SMTP_PASSWORD" | ssh -i ~/.ssh/parkplatz_deploy \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              'umask 077; cat > /srv/parkplatz/.smtp-password'
 
-          ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            'cd /srv/parkplatz && SMTP_PASSWORD_FILE=/srv/parkplatz/.smtp-password ./ops/deploy-backend.sh'
+            ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              'cd /srv/parkplatz && SMTP_PASSWORD_FILE=/srv/parkplatz/.smtp-password ./ops/deploy-backend.sh'
+          } 2>&1 | tee /tmp/production-backend-deploy.log
+
+      - name: Report production backend deployment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const ok = '${{ steps.production_backend_deploy.outcome }}' === 'success';
+            const raw = fs.existsSync('/tmp/production-backend-deploy.log')
+              ? fs.readFileSync('/tmp/production-backend-deploy.log', 'utf8')
+              : 'No production backend deployment log was produced.';
+            const tail = raw.split('\n').slice(-180).join('\n').slice(-18000);
+            const body = (ok
+              ? '✅ Production backend deployment succeeded.'
+              : '❌ Production backend deployment failed.')
+              + '\n\n```text\n' + tail + '\n```'
+              + '\n\nWorkflow run: ' + context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId;
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 12,
+              title: ok ? 'Production deployment healthy' : 'Production deployment failed',
+              state: ok ? 'closed' : 'open',
+              body,
+            });
+
+      - name: Enforce production backend deployment result
+        if: steps.production_backend_deploy.outcome == 'failure'
+        run: exit 1
 
       - name: Verify deployment, routes, release assets, and production API
+        if: steps.production_backend_deploy.outcome == 'success'
         run: |
           set -euo pipefail
 
