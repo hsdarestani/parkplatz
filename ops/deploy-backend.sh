@@ -21,6 +21,11 @@ done
 
 docker compose -f docker-compose.prod.yml up -d --build
 
+# Health and parking-space checks alone do not exercise password hashing,
+# token persistence, or the users/refresh_tokens schema. Run the complete
+# disposable auth lifecycle before considering the backend deploy successful.
+FREIRAUM_API_BASE_URL=http://127.0.0.1:8000/api python3 ./ops/smoke-auth.py
+
 for route in forgot-password reset-password account/security favorites onboarding; do
   install -d "/var/www/parkplatz/$route"
   cp /var/www/parkplatz/index.html "/var/www/parkplatz/$route/index.html"

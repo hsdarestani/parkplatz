@@ -18,9 +18,12 @@ class Settings(BaseSettings):
     pro_host_response_hours: int = 6
     free_listing_limit: int = 1
     pro_listing_limit: int = 10
-    receipt_upload_dir: str = "/var/lib/freiraum/uploads"
+
+    # Development, tests, and CI must start without root filesystem access.
+    # Production explicitly overrides these paths to persistent /var/lib volumes.
+    receipt_upload_dir: str = "/tmp/freiraum/uploads"
     receipt_max_bytes: int = 5_242_880
-    marketplace_upload_dir: str = "/var/lib/freiraum/marketplace-media"
+    marketplace_upload_dir: str = "/tmp/freiraum/marketplace-media"
     marketplace_image_max_bytes: int = 8_388_608
     password_reset_minutes: int = 30
 
