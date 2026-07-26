@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:parking/config/environment.dart';
+import 'package:freiraum_parking/config/environment.dart';
 
 void main() {
   test('default API base URL is safe for native release builds', () {
