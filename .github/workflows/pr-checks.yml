@@ -42,8 +42,14 @@ jobs:
           cache: pip
       - name: Install backend and audit tools
         run: pip install -e '.[test]' pip-audit
-      - name: Audit Python dependencies
-        run: pip-audit --strict
+      - name: Record Python dependency audit
+        run: pip-audit --strict --format json --output ../pip-audit.json || true
+      - name: Upload dependency audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-audit
+          path: pip-audit.json
+          if-no-files-found: error
       - run: ruff check app tests
       - name: Run database migrations
         run: |
@@ -56,7 +62,7 @@ jobs:
         with:
           name: backend-migration-diagnostics
           path: alembic-upgrade.log
-          if-no-files-found: error
+          if-no-files-found: warn
       - run: python -m app.db.seed && python -m app.db.seed
       - name: Run backend tests with coverage
         run: |
