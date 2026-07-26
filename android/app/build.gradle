@@ -1,5 +1,48 @@
-plugins { id "com.android.application"; id "kotlin-android"; id "dev.flutter.flutter-gradle-plugin" }
-android { namespace "de.freiraum.parking"; compileSdk flutter.compileSdkVersion
- defaultConfig { applicationId "de.freiraum.parking"; minSdkVersion flutter.minSdkVersion; targetSdkVersion flutter.targetSdkVersion; versionCode 1; versionName "0.1.0" }
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
 }
-flutter { source '../..' }
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+android {
+    namespace "de.freiraum.parking"
+    compileSdk flutter.compileSdkVersion
+
+    defaultConfig {
+        applicationId "de.freiraum.parking"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+    }
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            release {
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // A+ Publisher injects an encrypted, persistent upload key. The debug
+            // fallback keeps local release builds usable but is never used for Play upload.
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
