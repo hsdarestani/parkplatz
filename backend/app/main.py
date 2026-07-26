@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -19,6 +20,8 @@ from app.core.security import decode
 from app.db.session import Session
 from app.models import ParkingSpace
 from app.services.subscriptions import plan_limits, subscription_for
+
+logger = logging.getLogger("freiraum.api")
 
 app = FastAPI(title="FREIRAUM API", version=settings.version)
 app.include_router(router)
@@ -88,13 +91,23 @@ async def protect_launch_flows(request: Request, call_next):
                             },
                         )
             except Exception:
-                pass
+                logger.exception(
+                    "Failed to evaluate host listing limit for %s %s",
+                    request.method,
+                    request.url.path,
+                )
 
     return await call_next(request)
 
 
 @app.exception_handler(Exception)
-async def safe_error(_request: Request, _exception: Exception) -> JSONResponse:
+async def safe_error(request: Request, exception: Exception) -> JSONResponse:
+    logger.exception(
+        "Unhandled API error for %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exception,
+    )
     return JSONResponse(
         status_code=500,
         content={
