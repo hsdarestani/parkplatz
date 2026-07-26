@@ -114,7 +114,6 @@ jobs:
 
           versioned_main_name = f'main.{sha}.dart.js'
           versioned_bootstrap_name = f'flutter_bootstrap.{sha}.js'
-
           shutil.copy2(main, build_dir / versioned_main_name)
 
           bootstrap_text = bootstrap.read_text()
@@ -215,16 +214,29 @@ jobs:
             build/web/ \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/parkplatz/"
 
-      - name: Deploy backend and run migrations
+      - name: Deploy backend, SMTP settings, and migrations
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         run: |
           set -euo pipefail
+          if [[ -z "$SMTP_PASSWORD" ]]; then
+            echo "Required GitHub secret SMTP_PASSWORD is missing or empty." >&2
+            exit 1
+          fi
+
           rsync -az -e "ssh -i ~/.ssh/parkplatz_deploy" backend ops docker-compose.prod.yml \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/srv/parkplatz/"
+
+          # Transfer the password over SSH stdin into a mode-600 temporary file.
+          # It is never written to the repository or included in a command argument.
+          printf '%s' "$SMTP_PASSWORD" | ssh -i ~/.ssh/parkplatz_deploy \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            'umask 077; cat > /srv/parkplatz/.smtp-password'
+
           ssh -i ~/.ssh/parkplatz_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            'cd /srv/parkplatz && ./ops/deploy-backend.sh'
+            'cd /srv/parkplatz && SMTP_PASSWORD_FILE=/srv/parkplatz/.smtp-password ./ops/deploy-backend.sh'
 
       - name: Verify deployment, routes, release assets, and production API
         run: |
