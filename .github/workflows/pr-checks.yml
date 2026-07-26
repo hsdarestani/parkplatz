@@ -43,7 +43,10 @@ jobs:
       - name: Install backend and audit tools
         run: pip install -e '.[test]' pip-audit
       - name: Record Python dependency audit
-        run: pip-audit --strict --format json --output ../pip-audit.json || true
+        run: |
+          set +e
+          pip-audit --strict --format=json 2>&1 | tee ../pip-audit.json
+          exit 0
       - name: Upload dependency audit
         uses: actions/upload-artifact@v4
         with:
@@ -210,15 +213,21 @@ jobs:
           grep --fixed-strings 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml || \
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
       - name: Build Android App Bundle
-        run: >-
-          flutter build appbundle --release
-          --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api
-          --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
-      - uses: actions/upload-artifact@v4
+        run: |
+          set +e
+          flutter build appbundle --release \
+            --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
+            --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false \
+            2>&1 | tee android-build.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload Android release candidate and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: android-release-candidate
           path: |
             build/app/outputs/bundle/release/app-release.aab
+            android-build.log
             android
           if-no-files-found: error
 
