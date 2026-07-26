@@ -35,6 +35,9 @@ jobs:
       PUBLIC_APP_URL: http://localhost:8080
     steps:
       - uses: actions/checkout@v5
+      - name: Validate deployment shell scripts
+        working-directory: .
+        run: bash -n ops/bootstrap-server.sh ops/deploy-backend.sh
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
