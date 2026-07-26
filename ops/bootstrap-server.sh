@@ -89,10 +89,14 @@ sed -i 's/^PAYMENT_HOLD_MINUTES=30$/PAYMENT_HOLD_MINUTES=31/' .env.production
 
 chmod 600 .env.production
 
+# Build the freshly uploaded backend before running Alembic. Previously
+# `docker compose run api` could reuse the old image, so new migration files were
+# invisible even though the source tree on the server was current.
 docker compose -f "$COMPOSE_FILE" up -d db
+docker compose -f "$COMPOSE_FILE" build api notifications
 docker compose -f "$COMPOSE_FILE" run --rm api alembic upgrade heads
 docker compose -f "$COMPOSE_FILE" run --rm api python -m app.db.seed
-docker compose -f "$COMPOSE_FILE" up -d --build
+docker compose -f "$COMPOSE_FILE" up -d
 
 api_container_id="$(docker compose -f "$COMPOSE_FILE" ps -q api)"
 if [[ -z "$api_container_id" ]]; then
