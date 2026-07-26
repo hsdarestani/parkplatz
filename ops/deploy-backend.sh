@@ -120,8 +120,23 @@ if [[ "$api_ready" != true ]]; then
 fi
 
 # Health alone does not exercise password hashing, token persistence, or the
-# users/refresh_tokens schema. Run the complete disposable auth lifecycle.
-FREIRAUM_API_BASE_URL=http://127.0.0.1:8000/api python3 ./ops/smoke-auth.py
+# users/refresh_tokens schema. Run the complete disposable auth lifecycle. If it
+# fails, expose the API traceback and migration/schema state without printing
+# credentials or user records.
+if ! FREIRAUM_API_BASE_URL=http://127.0.0.1:8000/api python3 ./ops/smoke-auth.py; then
+  echo "Production authentication lifecycle failed; collecting diagnostics." >&2
+  echo "--- API and notification logs ---" >&2
+  docker compose -f "$COMPOSE_FILE" logs --no-color --tail=350 api notifications >&2 || true
+  echo "--- Alembic current state ---" >&2
+  docker compose -f "$COMPOSE_FILE" exec -T api alembic current --verbose >&2 || true
+  echo "--- Auth table schema ---" >&2
+  docker compose -f "$COMPOSE_FILE" exec -T db sh -lc '
+    psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      -c "SELECT version_num FROM alembic_version ORDER BY version_num;" \
+      -c "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = '\''public'\'' AND table_name IN ('\''users'\'', '\''refresh_tokens'\'', '\''password_reset_tokens'\'') ORDER BY table_name, ordinal_position;"
+  ' >&2 || true
+  exit 1
+fi
 
 for route in forgot-password reset-password account/security favorites onboarding; do
   install -d "/var/www/parkplatz/$route"
