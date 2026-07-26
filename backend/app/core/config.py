@@ -34,11 +34,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_vision_model: str = "gpt-5-mini"
     nominatim_base_url: str = "https://nominatim.openstreetmap.org"
-    nominatim_contact_email: str = "parkplatz@aplus-solution.de"
+    nominatim_contact_email: str = "app@aplus-solution.de"
 
     admin_emails: str = ""
-    trust_support_email: str = "parkplatz@aplus-solution.de"
-    primary_email: str = "parkplatz@aplus-solution.de"
+    trust_support_email: str = "app@aplus-solution.de"
+    primary_email: str = "app@aplus-solution.de"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
