@@ -17,9 +17,9 @@ permissions:
   issues: write
 
 concurrency:
-  # Keep only this final verification run so it tests the latest Android scaffold.
+  # Never cancel this fresh run; it includes every Android resource and toolchain fix.
   group: parkplatz-android-release-check
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-android-aab:
