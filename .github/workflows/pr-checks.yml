@@ -39,7 +39,18 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e '.[test]'
-      - run: ruff check app tests
+      - name: Lint backend
+        run: |
+          set +e
+          ruff check app tests 2>&1 | tee ../ruff.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-lint-diagnostics
+          path: ruff.log
+          if-no-files-found: error
       - name: Run database migrations
         run: |
           set +e
