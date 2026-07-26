@@ -43,11 +43,13 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install backend and audit tools
-        run: pip install -e '.[test]' pip-audit
+        run: |
+          pip install -e '.[test]' pip-audit
+          pip uninstall -y freiraum-backend
       - name: Record Python dependency audit
         run: |
           set +e
-          pip-audit --strict --skip-editable --format=json 2>&1 | tee ../pip-audit.json
+          pip-audit --strict --format=json 2>&1 | tee ../pip-audit.json
           exit 0
       - name: Upload dependency audit
         uses: actions/upload-artifact@v4
@@ -136,7 +138,7 @@ jobs:
         working-directory: .
         run: docker build -t freiraum-api-pr:${GITHUB_SHA} backend
       - name: Enforce backend dependency security gate
-        run: pip-audit --strict --skip-editable
+        run: pip-audit --strict
 
   flutter:
     runs-on: ubuntu-latest
