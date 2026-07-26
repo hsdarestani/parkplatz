@@ -17,8 +17,8 @@ permissions:
   issues: write
 
 concurrency:
-  # Never cancel this fresh run; it includes every Android resource and toolchain fix.
-  group: parkplatz-android-release-check
+  # Each commit gets an independent verification run, so old builds cannot block it.
+  group: parkplatz-android-release-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
