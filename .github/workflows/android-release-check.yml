@@ -18,7 +18,7 @@ permissions:
 
 concurrency:
   group: parkplatz-android-release-check
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-android-aab:
