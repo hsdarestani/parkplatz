@@ -17,6 +17,7 @@ permissions:
   issues: write
 
 concurrency:
+  # Keep only this final verification run so it tests the latest Android scaffold.
   group: parkplatz-android-release-check
   cancel-in-progress: true
 
