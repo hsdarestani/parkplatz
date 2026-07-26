@@ -21,18 +21,19 @@ class SearchSheetV2 extends ConsumerStatefulWidget {
 }
 
 class _SearchSheetV2State extends ConsumerState<SearchSheetV2> {
-  final pages = PageController();
-  int step = 0;
-  bool loadingVehicles = true;
-  List<Vehicle> savedVehicles = const [];
-  String? selectedBrand;
-  VehicleCatalogEntry? selectedCatalogModel;
+  final PageController _pages = PageController();
+  int _step = 0;
+  bool _loadingVehicles = true;
+  List<Vehicle> _savedVehicles = const [];
+  String? _selectedBrand;
+  VehicleCatalogEntry? _selectedModel;
 
-  static const stepTitles = [
-    'Zeitraum',
-    'Ziel',
-    'Fahrzeug',
-    'Filter',
+  static const _titles = ['Zeitraum', 'Ziel', 'Fahrzeug', 'Filter'];
+  static const _icons = [
+    Icons.calendar_month_rounded,
+    Icons.location_on_rounded,
+    Icons.directions_car_filled_rounded,
+    Icons.tune_rounded,
   ];
 
   @override
@@ -43,42 +44,43 @@ class _SearchSheetV2State extends ConsumerState<SearchSheetV2> {
 
   @override
   void dispose() {
-    pages.dispose();
+    _pages.dispose();
     super.dispose();
   }
 
   Future<void> _loadVehicles() async {
     try {
-      final values = await ref.read(vehicleRepositoryProvider).all();
-      savedVehicles = values
+      final records = await ref.read(vehicleRepositoryProvider).all();
+      _savedVehicles = records
           .map(
-            (vehicle) => Vehicle(
-              vehicle.id,
-              vehicle.name,
-              vehicle.plate,
-              vehicle.height,
-              vehicle.width,
-              vehicle.length,
+            (record) => Vehicle(
+              record.id,
+              record.name,
+              record.plate,
+              record.height,
+              record.width,
+              record.length,
             ),
           )
-          .toList();
+          .toList(growable: false);
     } catch (_) {
-      savedVehicles = const [];
+      _savedVehicles = const [];
     }
-    if (mounted) setState(() => loadingVehicles = false);
+    if (mounted) setState(() => _loadingVehicles = false);
   }
 
-  bool _ready(SearchQuery query) => switch (step) {
+  bool _canContinue(SearchQuery query) => switch (_step) {
         0 => query.end.isAfter(query.start),
         1 => query.destination != null,
         2 => query.vehicle != null,
         _ => query.valid,
       };
 
-  Future<void> _go(int target) async {
-    setState(() => step = target);
-    await pages.animateToPage(
-      target,
+  Future<void> _goTo(int page) async {
+    if (page < 0 || page >= _titles.length) return;
+    setState(() => _step = page);
+    await _pages.animateToPage(
+      page,
       duration: T.normal,
       curve: T.emphasized,
     );
@@ -88,137 +90,97 @@ class _SearchSheetV2State extends ConsumerState<SearchSheetV2> {
   Widget build(BuildContext context) {
     final query = ref.watch(searchProvider);
     final compact = MediaQuery.sizeOf(context).width < 620;
+
     return SafeArea(
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          compact ? 14 : 22,
-          10,
-          compact ? 14 : 22,
-          16,
-        ),
-        decoration: const BoxDecoration(
-          color: T.porcelain,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 4,
-              decoration: BoxDecoration(
-                color: T.lineStrong,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _StepIcon(step: step),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        stepTitles[step],
-                        style: TextStyle(
-                          fontSize: compact ? 22 : 27,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -.5,
-                        ),
-                      ),
-                      Text(
-                        'Schritt ${step + 1} von ${stepTitles.length}',
-                        style: const TextStyle(
-                          color: T.muted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton.filledTonal(
-                  tooltip: 'Schließen',
-                  onPressed: () => Navigator.maybePop(context),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: List.generate(
-                stepTitles.length,
-                (index) => Expanded(
-                  child: AnimatedContainer(
-                    duration: T.fast,
-                    height: 5,
-                    margin: EdgeInsets.only(
-                      right: index == stepTitles.length - 1 ? 0 : 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: index <= step ? T.mint : T.line,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
+      child: Material(
+        color: T.porcelain,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            compact ? 14 : 22,
+            10,
+            compact ? 14 : 22,
+            16,
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: T.lineStrong,
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: PageView(
-                controller: pages,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (value) => setState(() => step = value),
+              const SizedBox(height: 12),
+              _Header(
+                step: _step,
+                title: _titles[_step],
+                icon: _icons[_step],
+                compact: compact,
+                onClose: () => Navigator.maybePop(context),
+              ),
+              const SizedBox(height: 12),
+              _Progress(step: _step, count: _titles.length),
+              const SizedBox(height: 14),
+              Expanded(
+                child: PageView(
+                  controller: _pages,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (value) => setState(() => _step = value),
+                  children: [
+                    _TimingStep(query: query),
+                    _DestinationStep(query: query),
+                    _vehicleStep(query),
+                    _FilterStep(query: query),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
                 children: [
-                  _TimingStep(query: query),
-                  _DestinationStep(query: query),
-                  _vehicleStep(query),
-                  _FilterStep(query: query),
+                  if (_step > 0) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _goTo(_step - 1),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Zurück'),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _canContinue(query)
+                          ? _step == _titles.length - 1
+                              ? widget.onSubmit
+                              : () => _goTo(_step + 1)
+                          : null,
+                      icon: Icon(
+                        _step == _titles.length - 1
+                            ? Icons.travel_explore_rounded
+                            : Icons.arrow_forward_rounded,
+                      ),
+                      label: Text(
+                        _step == _titles.length - 1
+                            ? 'Freie Stellplätze anzeigen'
+                            : 'Weiter',
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (step > 0)
-                  OutlinedButton.icon(
-                    onPressed: () => _go(step - 1),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Zurück'),
-                  ),
-                if (step > 0) const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _ready(query)
-                        ? step == stepTitles.length - 1
-                            ? widget.onSubmit
-                            : () => _go(step + 1)
-                        : null,
-                    icon: Icon(
-                      step == stepTitles.length - 1
-                          ? Icons.travel_explore_rounded
-                          : Icons.arrow_forward_rounded,
-                    ),
-                    label: Text(
-                      step == stepTitles.length - 1
-                          ? 'Freie Stellplätze anzeigen'
-                          : 'Weiter',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _vehicleStep(SearchQuery query) {
-    final brands = vehicleBrands;
-    final models = selectedBrand == null
+    final models = _selectedBrand == null
         ? const <VehicleCatalogEntry>[]
-        : vehicleModelsFor(selectedBrand!);
+        : vehicleModelsFor(_selectedBrand!);
+
     return _WizardCard(
       icon: Icons.directions_car_filled_rounded,
       title: 'Fahrzeug passend auswählen',
@@ -227,43 +189,50 @@ class _SearchSheetV2State extends ConsumerState<SearchSheetV2> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (loadingVehicles) const LinearProgressIndicator(),
-          if (savedVehicles.isNotEmpty) ...[
+          if (_loadingVehicles) const LinearProgressIndicator(),
+          if (_savedVehicles.isNotEmpty) ...[
             const _Subheading('Deine Fahrzeuge', Icons.garage_outlined),
-            ...savedVehicles.map(
-              (vehicle) => _VehicleTile(
-                vehicle: vehicle,
-                selected: query.vehicle?.id == vehicle.id,
-                onTap: () => ref.read(searchProvider.notifier).vehicle(vehicle),
+            ..._savedVehicles.map(
+              (vehicle) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _SelectionTile(
+                  selected: query.vehicle?.id == vehicle.id,
+                  icon: Icons.directions_car_filled_rounded,
+                  title: vehicle.name,
+                  subtitle:
+                      '${vehicle.hasPlate ? '${vehicle.plate} · ' : ''}${_dimensions(vehicle)}',
+                  onTap: () =>
+                      ref.read(searchProvider.notifier).vehicle(vehicle),
+                ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
           ],
           const _Subheading('Marke und Modell', Icons.car_rental_rounded),
           DropdownButtonFormField<String>(
-            value: selectedBrand,
+            value: _selectedBrand,
             decoration: const InputDecoration(
               labelText: 'Marke',
               prefixIcon: Icon(Icons.factory_outlined),
             ),
-            items: brands
+            items: vehicleBrands
                 .map(
                   (brand) => DropdownMenuItem(
                     value: brand,
                     child: Text(brand),
                   ),
                 )
-                .toList(),
+                .toList(growable: false),
             onChanged: (value) {
               setState(() {
-                selectedBrand = value;
-                selectedCatalogModel = null;
+                _selectedBrand = value;
+                _selectedModel = null;
               });
             },
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<VehicleCatalogEntry>(
-            value: selectedCatalogModel,
+            value: _selectedModel,
             decoration: const InputDecoration(
               labelText: 'Modell',
               prefixIcon: Icon(Icons.directions_car_outlined),
@@ -275,25 +244,24 @@ class _SearchSheetV2State extends ConsumerState<SearchSheetV2> {
                     child: Text(model.model),
                   ),
                 )
-                .toList(),
-            onChanged: selectedBrand == null
+                .toList(growable: false),
+            onChanged: _selectedBrand == null
                 ? null
                 : (value) {
                     if (value == null) return;
-                    setState(() => selectedCatalogModel = value);
+                    setState(() => _selectedModel = value);
                     ref.read(searchProvider.notifier).vehicle(value.toVehicle());
                   },
           ),
-          if (selectedCatalogModel != null) ...[
+          if (_selectedModel != null) ...[
             const SizedBox(height: 12),
-            _CatalogPreview(entry: selectedCatalogModel!),
+            _CatalogPreview(entry: _selectedModel!),
           ],
           const SizedBox(height: 14),
           OutlinedButton.icon(
             onPressed: () {
-              final router = GoRouter.of(context);
-              Navigator.pop(context);
-              router.push('/vehicles');
+              Navigator.maybePop(context);
+              context.push('/vehicles');
             },
             icon: const Icon(Icons.add_circle_outline_rounded),
             label: const Text('Eigenes Fahrzeug hinzufügen'),
@@ -302,6 +270,94 @@ class _SearchSheetV2State extends ConsumerState<SearchSheetV2> {
       ),
     );
   }
+
+  String _dimensions(Vehicle vehicle) =>
+      '${vehicle.length.toStringAsFixed(2)} × ${vehicle.width.toStringAsFixed(2)} × ${vehicle.height.toStringAsFixed(2)} m';
+}
+
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.step,
+    required this.title,
+    required this.icon,
+    required this.compact,
+    required this.onClose,
+  });
+
+  final int step;
+  final String title;
+  final IconData icon;
+  final bool compact;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [T.mint, T.success]),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: T.shadowSmall,
+            ),
+            child: Icon(icon, color: T.ink),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: compact ? 22 : 27,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.5,
+                  ),
+                ),
+                Text(
+                  'Schritt ${step + 1} von 4',
+                  style: const TextStyle(
+                    color: T.muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton.filledTonal(
+            tooltip: 'Schließen',
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      );
+}
+
+class _Progress extends StatelessWidget {
+  const _Progress({required this.step, required this.count});
+
+  final int step;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: List.generate(
+          count,
+          (index) => Expanded(
+            child: AnimatedContainer(
+              duration: T.fast,
+              height: 5,
+              margin: EdgeInsets.only(right: index == count - 1 ? 0 : 6),
+              decoration: BoxDecoration(
+                color: index <= step ? T.mint : T.line,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _TimingStep extends ConsumerWidget {
@@ -313,6 +369,7 @@ class _TimingStep extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final date = DateFormat('EEE, dd. MMM', 'de_DE');
     final time = DateFormat('HH:mm');
+
     return _WizardCard(
       icon: Icons.calendar_month_rounded,
       title: 'Einfahrt und Ausfahrt festlegen',
@@ -325,34 +382,30 @@ class _TimingStep extends ConsumerWidget {
             title: 'Einfahrt',
             icon: Icons.login_rounded,
             accent: T.success,
-            dateLabel: date.format(query.start),
-            timeLabel: time.format(query.start),
-            onDate: () => _pickStartDate(context, ref, query),
-            onTime: () => _pickStartTime(context, ref, query),
+            value: '${date.format(query.start)} · ${time.format(query.start)}',
+            onDate: () => _pickStartDate(context, ref),
+            onTime: () => _pickStartTime(context, ref),
           ),
           const SizedBox(height: 12),
           _DateTimePanel(
             title: 'Ausfahrt',
             icon: Icons.logout_rounded,
             accent: T.warning,
-            dateLabel: date.format(query.end),
-            timeLabel: time.format(query.end),
-            onDate: () => _pickEndDate(context, ref, query),
-            onTime: () => _pickEndTime(context, ref, query),
+            value: '${date.format(query.end)} · ${time.format(query.end)}',
+            onDate: () => _pickEndDate(context, ref),
+            onTime: () => _pickEndTime(context, ref),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [T.ink, T.inkSoft]),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.timelapse_rounded, color: T.mint),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+          Material(
+            color: T.ink,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.timelapse_rounded, color: T.mint),
+                  const SizedBox(width: 12),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
@@ -369,8 +422,8 @@ class _TimingStep extends ConsumerWidget {
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -378,35 +431,31 @@ class _TimingStep extends ConsumerWidget {
             spacing: 8,
             runSpacing: 8,
             children: const [
-              (label: '2 Std.', duration: Duration(hours: 2)),
-              (label: '4 Std.', duration: Duration(hours: 4)),
-              (label: '8 Std.', duration: Duration(hours: 8)),
-              (label: '1 Tag', duration: Duration(days: 1)),
-              (label: '2 Tage', duration: Duration(days: 2)),
-              (label: '3 Tage', duration: Duration(days: 3)),
-              (label: '7 Tage', duration: Duration(days: 7)),
+              ('2 Std.', Duration(hours: 2)),
+              ('4 Std.', Duration(hours: 4)),
+              ('8 Std.', Duration(hours: 8)),
+              ('1 Tag', Duration(days: 1)),
+              ('2 Tage', Duration(days: 2)),
+              ('3 Tage', Duration(days: 3)),
+              ('7 Tage', Duration(days: 7)),
             ]
                 .map(
                   (option) => ActionChip(
                     avatar: const Icon(Icons.schedule_rounded, size: 17),
-                    label: Text(option.label),
+                    label: Text(option.$1),
                     onPressed: () => ref
                         .read(searchProvider.notifier)
-                        .durationValue(option.duration),
+                        .durationValue(option.$2),
                   ),
                 )
-                .toList(),
+                .toList(growable: false),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _pickStartDate(
-    BuildContext context,
-    WidgetRef ref,
-    SearchQuery query,
-  ) async {
+  Future<void> _pickStartDate(BuildContext context, WidgetRef ref) async {
     final now = DateTime.now();
     final selected = await showDatePicker(
       context: context,
@@ -426,11 +475,7 @@ class _TimingStep extends ConsumerWidget {
         );
   }
 
-  Future<void> _pickEndDate(
-    BuildContext context,
-    WidgetRef ref,
-    SearchQuery query,
-  ) async {
+  Future<void> _pickEndDate(BuildContext context, WidgetRef ref) async {
     final selected = await showDatePicker(
       context: context,
       initialDate: query.end.isBefore(query.start) ? query.start : query.end,
@@ -445,15 +490,13 @@ class _TimingStep extends ConsumerWidget {
       query.end.hour,
       query.end.minute,
     );
-    if (!end.isAfter(query.start)) end = query.start.add(const Duration(hours: 1));
+    if (!end.isAfter(query.start)) {
+      end = query.start.add(const Duration(hours: 1));
+    }
     ref.read(searchProvider.notifier).range(query.start, end);
   }
 
-  Future<void> _pickStartTime(
-    BuildContext context,
-    WidgetRef ref,
-    SearchQuery query,
-  ) async {
+  Future<void> _pickStartTime(BuildContext context, WidgetRef ref) async {
     final selected = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(query.start),
@@ -470,11 +513,7 @@ class _TimingStep extends ConsumerWidget {
         );
   }
 
-  Future<void> _pickEndTime(
-    BuildContext context,
-    WidgetRef ref,
-    SearchQuery query,
-  ) async {
+  Future<void> _pickEndTime(BuildContext context, WidgetRef ref) async {
     final selected = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(query.end),
@@ -502,18 +541,20 @@ class _DestinationStep extends ConsumerStatefulWidget {
 }
 
 class _DestinationStepState extends ConsumerState<_DestinationStep> {
-  String search = '';
+  String _search = '';
 
   @override
   Widget build(BuildContext context) {
+    final needle = _search.trim().toLowerCase();
     final matches = demoDestinations
         .where(
-          (destination) => search.trim().isEmpty ||
+          (destination) => needle.isEmpty ||
               '${destination.name} ${destination.district}'
                   .toLowerCase()
-                  .contains(search.trim().toLowerCase()),
+                  .contains(needle),
         )
-        .toList();
+        .toList(growable: false);
+
     return _WizardCard(
       icon: Icons.location_searching_rounded,
       title: 'Ziel auswählen',
@@ -527,40 +568,20 @@ class _DestinationStepState extends ConsumerState<_DestinationStep> {
               hintText: 'Messe, Bahnhof oder Sehenswürdigkeit',
               prefixIcon: Icon(Icons.search_rounded),
             ),
-            onChanged: (value) => setState(() => search = value),
+            onChanged: (value) => setState(() => _search = value),
           ),
           const SizedBox(height: 12),
           ...matches.map(
             (destination) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                onTap: () =>
-                    ref.read(searchProvider.notifier).destination(destination),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(17),
-                  side: BorderSide(
-                    color: widget.query.destination?.id == destination.id
-                        ? T.mint
-                        : T.line,
-                  ),
-                ),
-                tileColor: widget.query.destination?.id == destination.id
-                    ? T.mintSoft
-                    : T.surface,
-                leading: Icon(
-                  widget.query.destination?.id == destination.id
-                      ? Icons.check_circle_rounded
-                      : Icons.place_outlined,
-                  color: widget.query.destination?.id == destination.id
-                      ? T.success
-                      : T.muted,
-                ),
-                title: Text(
-                  destination.name,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                subtitle: Text(destination.district),
-                trailing: const Icon(Icons.chevron_right_rounded),
+              child: _SelectionTile(
+                selected: widget.query.destination?.id == destination.id,
+                icon: Icons.place_outlined,
+                title: destination.name,
+                subtitle: destination.district,
+                onTap: () => ref
+                    .read(searchProvider.notifier)
+                    .destination(destination),
               ),
             ),
           ),
@@ -590,10 +611,11 @@ class _FilterStep extends ConsumerWidget {
       ('indoor', 'Innen', Icons.meeting_room_rounded),
       ('outdoor', 'Außen', Icons.wb_sunny_rounded),
     ];
+
     return _WizardCard(
       icon: Icons.tune_rounded,
       title: 'Wichtige Eigenschaften',
-      subtitle: 'Große, visuelle Filter statt einer langen Textliste.',
+      subtitle: 'Wähle nur die Merkmale, die du wirklich brauchst.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -611,7 +633,7 @@ class _FilterStep extends ConsumerWidget {
                         ref.read(searchProvider.notifier).toggle(item.$1),
                   ),
                 )
-                .toList(),
+                .toList(growable: false),
           ),
           const SizedBox(height: 20),
           const _Subheading('Stellplatzart', Icons.local_parking_rounded),
@@ -629,7 +651,7 @@ class _FilterStep extends ConsumerWidget {
                         .exclusiveAccessFilter(item.$1),
                   ),
                 )
-                .toList(),
+                .toList(growable: false),
           ),
           const SizedBox(height: 20),
           DropdownButtonFormField<String>(
@@ -647,54 +669,31 @@ class _FilterStep extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: T.mintSoft,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: T.mint),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.verified_rounded, color: T.success),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${query.summary()} · ${query.durationLabel()}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+          Material(
+            color: T.mintSoft,
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: T.mint),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_rounded, color: T.success),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${query.summary()} · ${query.durationLabel()}',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _StepIcon extends StatelessWidget {
-  const _StepIcon({required this.step});
-
-  final int step;
-
-  @override
-  Widget build(BuildContext context) {
-    final icons = [
-      Icons.calendar_month_rounded,
-      Icons.location_on_rounded,
-      Icons.directions_car_filled_rounded,
-      Icons.tune_rounded,
-    ];
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [T.mint, T.success]),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: T.shadowSmall,
-      ),
-      child: Icon(icons[step], color: T.ink),
     );
   }
 }
@@ -715,51 +714,114 @@ class _WizardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: T.surfaceRaised,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: T.line),
-            boxShadow: T.shadowSmall,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: T.mintSoft,
-                      borderRadius: BorderRadius.circular(15),
+        child: Material(
+          color: T.surfaceRaised,
+          elevation: 2,
+          shadowColor: T.ink.withOpacity(.12),
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: T.line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: T.mintSoft,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(icon, color: T.success),
                     ),
-                    child: Icon(icon, color: T.success),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                        ),
-                        Text(subtitle, style: const TextStyle(color: T.muted)),
-                      ],
+                          Text(
+                            subtitle,
+                            style: const TextStyle(color: T.muted),
+                          ),
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                child,
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _SelectionTile extends StatelessWidget {
+  const _SelectionTile({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: selected ? T.mintSoft : T.surface,
+        borderRadius: BorderRadius.circular(17),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: selected ? T.mint : T.line),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected ? Icons.check_circle_rounded : icon,
+                  color: selected ? T.success : T.muted,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      Text(subtitle, style: const TextStyle(color: T.muted)),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              child,
-            ],
+                ),
+                const Icon(Icons.chevron_right_rounded, color: T.muted),
+              ],
+            ),
           ),
         ),
       );
@@ -770,8 +832,7 @@ class _DateTimePanel extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.accent,
-    required this.dateLabel,
-    required this.timeLabel,
+    required this.value,
     required this.onDate,
     required this.onTime,
   });
@@ -779,91 +840,56 @@ class _DateTimePanel extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color accent;
-  final String dateLabel;
-  final String timeLabel;
+  final String value;
   final VoidCallback onDate;
   final VoidCallback onTime;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: T.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: T.line),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent.withOpacity(.12),
-                borderRadius: BorderRadius.circular(14),
+  Widget build(BuildContext context) => Material(
+        color: T.surface,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: T.line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: accent),
               ),
-              child: Icon(icon, color: accent),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  Text('$dateLabel · $timeLabel', style: const TextStyle(color: T.muted)),
-                ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(value, style: const TextStyle(color: T.muted)),
+                  ],
+                ),
               ),
-            ),
-            IconButton.filledTonal(
-              tooltip: 'Datum ändern',
-              onPressed: onDate,
-              icon: const Icon(Icons.calendar_today_outlined),
-            ),
-            const SizedBox(width: 4),
-            IconButton.filledTonal(
-              tooltip: 'Uhrzeit ändern',
-              onPressed: onTime,
-              icon: const Icon(Icons.schedule_rounded),
-            ),
-          ],
-        ),
-      );
-}
-
-class _VehicleTile extends StatelessWidget {
-  const _VehicleTile({
-    required this.vehicle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final Vehicle vehicle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          onTap: onTap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(17),
-            side: BorderSide(color: selected ? T.mint : T.line),
-          ),
-          tileColor: selected ? T.mintSoft : T.surface,
-          leading: Icon(
-            Icons.directions_car_filled_rounded,
-            color: selected ? T.success : T.muted,
-          ),
-          title: Text(
-            vehicle.name,
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          subtitle: Text(
-            '${vehicle.hasPlate ? '${vehicle.plate} · ' : ''}${vehicle.length.toStringAsFixed(2)} × ${vehicle.width.toStringAsFixed(2)} × ${vehicle.height.toStringAsFixed(2)} m',
-          ),
-          trailing: Icon(
-            selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-            color: selected ? T.success : T.muted,
+              IconButton.filledTonal(
+                tooltip: 'Datum ändern',
+                onPressed: onDate,
+                icon: const Icon(Icons.calendar_today_outlined),
+              ),
+              const SizedBox(width: 4),
+              IconButton.filledTonal(
+                tooltip: 'Uhrzeit ändern',
+                onPressed: onTime,
+                icon: const Icon(Icons.schedule_rounded),
+              ),
+            ],
           ),
         ),
       );
@@ -875,33 +901,36 @@ class _CatalogPreview extends StatelessWidget {
   final VehicleCatalogEntry entry;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: T.mintSoft,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: T.mint),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: T.success),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${entry.brand} ${entry.model}',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  Text(
-                    '${entry.length.toStringAsFixed(2)} × ${entry.width.toStringAsFixed(2)} × ${entry.height.toStringAsFixed(2)} m · ohne Kennzeichen',
-                    style: const TextStyle(color: T.muted),
-                  ),
-                ],
+  Widget build(BuildContext context) => Material(
+        color: T.mintSoft,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: T.mint),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: T.success),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${entry.brand} ${entry.model}',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      '${entry.length.toStringAsFixed(2)} × ${entry.width.toStringAsFixed(2)} × ${entry.height.toStringAsFixed(2)} m · ohne Kennzeichen',
+                      style: const TextStyle(color: T.muted),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
 }
@@ -942,28 +971,31 @@ class _VisualFilter extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+  Widget build(BuildContext context) => Material(
+        color: selected ? T.mintSoft : T.surface,
         borderRadius: BorderRadius.circular(18),
-        child: AnimatedContainer(
-          duration: T.fast,
-          width: 132,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            color: selected ? T.mintSoft : T.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: selected ? T.mint : T.line),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: selected ? T.success : T.muted, size: 27),
-              const SizedBox(height: 7),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ],
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: T.fast,
+            width: 132,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: selected ? T.mint : T.line),
+            ),
+            child: Column(
+              children: [
+                Icon(icon, color: selected ? T.success : T.muted, size: 27),
+                const SizedBox(height: 7),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
           ),
         ),
       );
