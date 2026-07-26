@@ -1,0 +1,63 @@
+name: Android release check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'lib/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/android-release-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parkplatz-android-release-check
+  cancel-in-progress: true
+
+jobs:
+  build-android-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter sources
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build release app bundle
+        run: >-
+          flutter build appbundle --release
+          --build-name 0.9.2
+          --build-number 3
+          --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api
+          --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
+
+      - name: Upload test AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: freiraum-android-aab
+          path: build/app/outputs/bundle/release/*.aab
+          if-no-files-found: error
