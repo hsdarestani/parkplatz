@@ -40,7 +40,6 @@ namespaces = false
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-branch = true
 source = ["app"]
 
 [tool.coverage.report]
