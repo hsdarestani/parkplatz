@@ -53,6 +53,26 @@ jobs:
           path: alembic-upgrade.log
           if-no-files-found: error
       - run: python -m app.db.seed && python -m app.db.seed
+      - name: Exercise registration, authenticated profile, and account deletion
+        run: |
+          set -euo pipefail
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../auth-smoke-api.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          FREIRAUM_API_BASE_URL=http://127.0.0.1:8000/api python3 ../ops/smoke-auth.py
+      - name: Upload auth smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-auth-smoke-diagnostics
+          path: auth-smoke-api.log
+          if-no-files-found: warn
       - name: Run backend tests
         run: |
           set +e
