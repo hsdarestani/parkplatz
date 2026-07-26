@@ -4,6 +4,8 @@ cd /srv/parkplatz
 
 APP_EMAIL="app@aplus-solution.de"
 SMTP_PASSWORD_FILE="${SMTP_PASSWORD_FILE:-}"
+COMPOSE_FILE="docker-compose.prod.yml"
+HEALTH_URL="http://127.0.0.1:8000/api/health"
 
 cleanup_secret() {
   if [[ -n "$SMTP_PASSWORD_FILE" ]]; then
@@ -77,11 +79,48 @@ PY
 
 # Recreate services after updating the environment so the API and notification
 # worker receive the active mailbox credentials.
-docker compose -f docker-compose.prod.yml up -d --build --force-recreate api notifications
+docker compose -f "$COMPOSE_FILE" up -d --build --force-recreate api notifications
 
-# Health and parking-space checks alone do not exercise password hashing,
-# token persistence, or the users/refresh_tokens schema. Run the complete
-# disposable auth lifecycle before considering the backend deploy successful.
+# force-recreate stops the healthy API created by bootstrap-server.sh. Wait for
+# the replacement container to become healthy before running the auth lifecycle.
+api_container_id="$(docker compose -f "$COMPOSE_FILE" ps -q api)"
+if [[ -z "$api_container_id" ]]; then
+  echo "API container was not created after applying SMTP settings." >&2
+  docker compose -f "$COMPOSE_FILE" ps >&2
+  exit 1
+fi
+
+api_ready=false
+for attempt in $(seq 1 60); do
+  if curl --fail --silent --show-error --max-time 5 "$HEALTH_URL" \
+    | grep --quiet --extended-regexp '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+    api_ready=true
+    break
+  fi
+
+  container_status="$(docker inspect --format '{{.State.Status}}' "$api_container_id" 2>/dev/null || true)"
+  health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$api_container_id" 2>/dev/null || true)"
+
+  if [[ "$container_status" != "running" || "$health_status" == "unhealthy" ]]; then
+    echo "API failed after SMTP restart (status=$container_status, health=$health_status)." >&2
+    docker compose -f "$COMPOSE_FILE" ps >&2
+    docker compose -f "$COMPOSE_FILE" logs --no-color --tail=250 api notifications >&2
+    exit 1
+  fi
+
+  echo "Waiting for API after SMTP restart ($attempt/60, health=$health_status)..."
+  sleep 2
+done
+
+if [[ "$api_ready" != true ]]; then
+  echo "API did not become ready after applying SMTP settings." >&2
+  docker compose -f "$COMPOSE_FILE" ps >&2
+  docker compose -f "$COMPOSE_FILE" logs --no-color --tail=250 api notifications >&2
+  exit 1
+fi
+
+# Health alone does not exercise password hashing, token persistence, or the
+# users/refresh_tokens schema. Run the complete disposable auth lifecycle.
 FREIRAUM_API_BASE_URL=http://127.0.0.1:8000/api python3 ./ops/smoke-auth.py
 
 for route in forgot-password reset-password account/security favorites onboarding; do
