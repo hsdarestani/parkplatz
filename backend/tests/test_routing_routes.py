@@ -45,11 +45,12 @@ class _Client:
 
 def _install_client(monkeypatch: pytest.MonkeyPatch, response: _Response) -> _Client:
     client = _Client(response)
-    monkeypatch.setattr(
-        routing_routes.httpx,
-        "AsyncClient",
-        lambda *, timeout: client,
-    )
+
+    def factory(*, timeout: float) -> _Client:
+        assert timeout > 0
+        return client
+
+    monkeypatch.setattr(routing_routes.httpx, "AsyncClient", factory)
     return client
 
 
