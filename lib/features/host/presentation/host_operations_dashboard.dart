@@ -38,8 +38,10 @@ class _HostOperationsDashboardState
     switch (action) {
       case _HostTopAction.trust:
         context.go('/trust');
+        return;
       case _HostTopAction.finance:
         context.go('/host/finance');
+        return;
     }
   }
 
