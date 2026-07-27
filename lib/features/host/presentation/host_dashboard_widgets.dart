@@ -15,7 +15,7 @@ class HostMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 230,
+        width: double.infinity,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: T.surface,
@@ -41,12 +41,19 @@ class HostMetricCard extends StatelessWidget {
                 children: [
                   Text(
                     value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 23,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  Text(label, style: const TextStyle(color: T.muted)),
+                  Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: T.muted),
+                  ),
                 ],
               ),
             ),
@@ -65,6 +72,71 @@ class HostSpaceCard extends StatelessWidget {
   final HostSpaceRecord space;
   final ValueChanged<String> onStatusChanged;
 
+  Widget _icon() => Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          color: space.active ? T.mintSoft : T.porcelainDeep,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Icon(
+          space.covered ? Icons.garage_outlined : Icons.local_parking,
+          color: space.active ? T.success : T.muted,
+        ),
+      );
+
+  Widget _details() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                space.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Chip(label: Text(space.active ? 'Online' : 'Pausiert')),
+            ],
+          ),
+          Text(
+            '${space.district} · ${space.landmark}',
+            style: const TextStyle(color: T.muted),
+          ),
+          Text(
+            '${euros(space.hourlyPriceCents)} € / Std. · ${space.maxLength.toStringAsFixed(1)} m Länge',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          if (!space.verified)
+            const Text(
+              'Noch nicht verifiziert',
+              style: TextStyle(color: T.warning),
+            ),
+        ],
+      );
+
+  Widget _manageButton(BuildContext context) => FilledButton.icon(
+        onPressed: () => context.go('/host/${space.id}/manage'),
+        icon: const Icon(Icons.tune_outlined),
+        label: const Text('Verwalten'),
+      );
+
+  Widget _viewButton(BuildContext context) => OutlinedButton.icon(
+        onPressed: space.active ? () => context.go('/parking/${space.id}') : null,
+        icon: const Icon(Icons.visibility_outlined),
+        label: const Text('Ansehen'),
+      );
+
+  Widget _statusButton() => FilledButton.tonalIcon(
+        onPressed: () => onStatusChanged(space.active ? 'paused' : 'active'),
+        icon: Icon(space.active ? Icons.pause : Icons.play_arrow),
+        label: Text(space.active ? 'Pausieren' : 'Aktivieren'),
+      );
+
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -75,78 +147,57 @@ class HostSpaceCard extends StatelessWidget {
           border: Border.all(color: T.line),
           boxShadow: T.shadowSmall,
         ),
-        child: Wrap(
-          spacing: 16,
-          runSpacing: 14,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: space.active ? T.mintSoft : T.porcelainDeep,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                space.covered ? Icons.garage_outlined : Icons.local_parking,
-                color: space.active ? T.success : T.muted,
-              ),
-            ),
-            SizedBox(
-              width: 430,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 720;
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Wrap(
-                    spacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        space.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Chip(label: Text(space.active ? 'Online' : 'Pausiert')),
+                      _icon(),
+                      const SizedBox(width: 14),
+                      Expanded(child: _details()),
                     ],
                   ),
-                  Text(
-                    '${space.district} · ${space.landmark}',
-                    style: const TextStyle(color: T.muted),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _manageButton(context),
                   ),
-                  Text(
-                    '${euros(space.hourlyPriceCents)} € / Std. · ${space.maxLength.toStringAsFixed(1)} m Länge',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _viewButton(context),
                   ),
-                  if (!space.verified)
-                    const Text(
-                      'Noch nicht verifiziert',
-                      style: TextStyle(color: T.warning),
-                    ),
+                  const SizedBox(height: 10),
+                  SizedBox(width: double.infinity, child: _statusButton()),
                 ],
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: () => context.go('/host/${space.id}/manage'),
-              icon: const Icon(Icons.tune_outlined),
-              label: const Text('Verwalten'),
-            ),
-            OutlinedButton.icon(
-              onPressed: space.active
-                  ? () => context.go('/parking/${space.id}')
-                  : null,
-              icon: const Icon(Icons.visibility_outlined),
-              label: const Text('Ansehen'),
-            ),
-            FilledButton.tonalIcon(
-              onPressed: () => onStatusChanged(
-                space.active ? 'paused' : 'active',
-              ),
-              icon: Icon(space.active ? Icons.pause : Icons.play_arrow),
-              label: Text(space.active ? 'Pausieren' : 'Aktivieren'),
-            ),
-          ],
+              );
+            }
+
+            return Wrap(
+              spacing: 16,
+              runSpacing: 14,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _icon(),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: 280,
+                    maxWidth: 430,
+                  ),
+                  child: _details(),
+                ),
+                _manageButton(context),
+                _viewButton(context),
+                _statusButton(),
+              ],
+            );
+          },
         ),
       );
 }
@@ -165,30 +216,44 @@ class HostBookingTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: T.line),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.event_available_outlined, color: T.success),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 420;
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  booking.title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  '${hostDateTime(booking.start)} · ${booking.plate}',
+                  style: const TextStyle(color: T.muted),
+                ),
+                if (compact) ...[
+                  const SizedBox(height: 6),
                   Text(
-                    booking.title,
+                    '${euros(booking.totalCents)} €',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  Text(
-                    '${hostDateTime(booking.start)} · ${booking.plate}',
-                    style: const TextStyle(color: T.muted),
-                  ),
                 ],
-              ),
-            ),
-            Text(
-              '${euros(booking.totalCents)} €',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ],
+              ],
+            );
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.event_available_outlined, color: T.success),
+                const SizedBox(width: 12),
+                Expanded(child: details),
+                if (!compact)
+                  Text(
+                    '${euros(booking.totalCents)} €',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+              ],
+            );
+          },
         ),
       );
 }
@@ -206,21 +271,34 @@ class HostEmptySpaces extends StatelessWidget {
           borderRadius: BorderRadius.circular(T.radius),
           border: Border.all(color: T.line),
         ),
-        child: Column(
-          children: [
-            const Icon(Icons.add_home_work_outlined, size: 62, color: T.muted),
-            const SizedBox(height: 12),
-            const Text(
-              'Noch kein Stellplatz',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('Ersten Stellplatz hinzufügen'),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 500;
+            return Column(
+              children: [
+                const Icon(
+                  Icons.add_home_work_outlined,
+                  size: 62,
+                  color: T.muted,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Noch kein Stellplatz',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: compact ? double.infinity : null,
+                  child: FilledButton.icon(
+                    onPressed: onAdd,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Ersten Stellplatz hinzufügen'),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       );
 }

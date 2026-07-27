@@ -10,6 +10,8 @@ import '../data/host_repository.dart';
 import 'host_dashboard_widgets.dart';
 import 'host_manage_components.dart';
 
+enum _HostTopAction { trust, finance }
+
 class HostOperationsDashboard extends ConsumerStatefulWidget {
   const HostOperationsDashboard({super.key});
 
@@ -32,44 +34,89 @@ class _HostOperationsDashboardState
 
   void _reload() => setState(() => future = _load());
 
+  void _handleTopAction(_HostTopAction action) {
+    switch (action) {
+      case _HostTopAction.trust:
+        context.go('/trust');
+        return;
+      case _HostTopAction.finance:
+        context.go('/host/finance');
+        return;
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => FreiraumScaffold(
-        title: 'Stellplatz vermieten',
-        subtitle: 'Angebote, Buchungen, Preise und Verfügbarkeit verwalten.',
-        activePath: '/host',
-        actions: [
-          OutlinedButton.icon(
-            onPressed: () => context.go('/trust'),
-            icon: const Icon(Icons.verified_user_outlined),
-            label: const Text('Prüfung'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => context.go('/host/finance'),
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            label: const Text('Finanzen'),
-          ),
-          FilledButton.icon(
-            onPressed: () => context.go('/host/new'),
-            icon: const Icon(Icons.add),
-            label: const Text('Stellplatz hinzufügen'),
-          ),
-        ],
-        child: FutureBuilder<_Snapshot>(
-          future: future,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return HostErrorState(
-                message: snapshot.error.toString(),
-                onRetry: _reload,
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _content(snapshot.data!);
-          },
-        ),
-      );
+  Widget build(BuildContext context) {
+    final compactHeader = MediaQuery.sizeOf(context).width < 640;
+
+    return FreiraumScaffold(
+      title: 'Stellplatz vermieten',
+      subtitle: 'Angebote, Buchungen, Preise und Verfügbarkeit verwalten.',
+      activePath: '/host',
+      actions: compactHeader
+          ? [
+              IconButton(
+                tooltip: 'Stellplatz hinzufügen',
+                onPressed: () => context.go('/host/new'),
+                icon: const Icon(Icons.add_home_work_outlined),
+              ),
+              PopupMenuButton<_HostTopAction>(
+                tooltip: 'Weitere Aktionen',
+                onSelected: _handleTopAction,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: _HostTopAction.trust,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.verified_user_outlined),
+                      title: Text('Prüfung'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _HostTopAction.finance,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.account_balance_wallet_outlined),
+                      title: Text('Finanzen'),
+                    ),
+                  ),
+                ],
+              ),
+            ]
+          : [
+              OutlinedButton.icon(
+                onPressed: () => context.go('/trust'),
+                icon: const Icon(Icons.verified_user_outlined),
+                label: const Text('Prüfung'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => context.go('/host/finance'),
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('Finanzen'),
+              ),
+              FilledButton.icon(
+                onPressed: () => context.go('/host/new'),
+                icon: const Icon(Icons.add),
+                label: const Text('Stellplatz hinzufügen'),
+              ),
+            ],
+      child: FutureBuilder<_Snapshot>(
+        future: future,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return HostErrorState(
+              message: snapshot.error.toString(),
+              onRetry: _reload,
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _content(snapshot.data!);
+        },
+      ),
+    );
+  }
 
   Widget _content(_Snapshot snapshot) {
     final active = snapshot.spaces.where((space) => space.active).length;
@@ -80,6 +127,7 @@ class _HostOperationsDashboardState
       0,
       (sum, booking) => sum + booking.totalCents,
     );
+    final compact = MediaQuery.sizeOf(context).width < 600;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -87,7 +135,12 @@ class _HostOperationsDashboardState
         await future;
       },
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+          compact ? 16 : 24,
+          compact ? 16 : 24,
+          compact ? 16 : 24,
+          28,
+        ),
         children: [
           Center(
             child: ConstrainedBox(
@@ -99,26 +152,48 @@ class _HostOperationsDashboardState
                   const SizedBox(height: 18),
                   MotionReveal(
                     delay: const Duration(milliseconds: 70),
-                    child: Wrap(
-                      spacing: 14,
-                      runSpacing: 14,
-                      children: [
-                        HostMetricCard(
-                          '$active',
-                          'aktive Stellplätze',
-                          icon: Icons.local_parking_outlined,
-                        ),
-                        HostMetricCard(
-                          '${confirmed.length}',
-                          'offene Buchungen',
-                          icon: Icons.event_available_outlined,
-                        ),
-                        HostMetricCard(
-                          '${euros(earnings)} €',
-                          'Buchungsumsatz',
-                          icon: Icons.payments_outlined,
-                        ),
-                      ],
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = constraints.maxWidth >= 780
+                            ? 3
+                            : constraints.maxWidth >= 520
+                                ? 2
+                                : 1;
+                        final cardWidth =
+                            (constraints.maxWidth - (columns - 1) * 14) /
+                                columns;
+
+                        return Wrap(
+                          spacing: 14,
+                          runSpacing: 14,
+                          children: [
+                            SizedBox(
+                              width: cardWidth,
+                              child: HostMetricCard(
+                                '$active',
+                                'aktive Stellplätze',
+                                icon: Icons.local_parking_outlined,
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: HostMetricCard(
+                                '${confirmed.length}',
+                                'offene Buchungen',
+                                icon: Icons.event_available_outlined,
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: HostMetricCard(
+                                '${euros(earnings)} €',
+                                'Buchungsumsatz',
+                                icon: Icons.payments_outlined,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 28),
@@ -164,51 +239,70 @@ class _HostOperationsDashboardState
     );
   }
 
-  Widget _hero() => Container(
-        padding: const EdgeInsets.all(26),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [T.ink, T.inkSoft]),
-          borderRadius: BorderRadius.circular(T.radiusSpacious),
-          boxShadow: T.shadow,
-        ),
-        child: Wrap(
-          spacing: 24,
-          runSpacing: 18,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const Icon(
-              Icons.dashboard_customize_outlined,
-              color: T.mint,
-              size: 54,
-            ),
-            const SizedBox(
-              width: 570,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dein Vermietungs-Cockpit',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 27,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Bearbeite Angebote, steuere Verfügbarkeit und behalte Zahlungen und Auszahlungen im Blick.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
+  Widget _hero() => LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 720;
+          final text = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dein Vermietungs-Cockpit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: compact ? 25 : 27,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
+              const SizedBox(height: 6),
+              const Text(
+                'Bearbeite Angebote, steuere Verfügbarkeit und behalte Zahlungen und Auszahlungen im Blick.',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ],
+          );
+          final financeButton = FilledButton.tonalIcon(
+            onPressed: () => context.go('/host/finance'),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            label: const Text('Finanzen öffnen'),
+          );
+
+          return Container(
+            padding: EdgeInsets.all(compact ? 22 : 26),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [T.ink, T.inkSoft]),
+              borderRadius: BorderRadius.circular(T.radiusSpacious),
+              boxShadow: T.shadow,
             ),
-            FilledButton.tonalIcon(
-              onPressed: () => context.go('/host/finance'),
-              icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: const Text('Finanzen öffnen'),
-            ),
-          ],
-        ),
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.dashboard_customize_outlined,
+                        color: T.mint,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 18),
+                      text,
+                      const SizedBox(height: 20),
+                      SizedBox(width: double.infinity, child: financeButton),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      const Icon(
+                        Icons.dashboard_customize_outlined,
+                        color: T.mint,
+                        size: 54,
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(child: text),
+                      const SizedBox(width: 24),
+                      financeButton,
+                    ],
+                  ),
+          );
+        },
       );
 
   Future<void> _setStatus(HostSpaceRecord space, String status) async {
