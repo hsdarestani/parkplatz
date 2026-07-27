@@ -46,7 +46,7 @@ void main() {
     );
 
     final context = tester.element(find.text('Überdacht'));
-    expect(ChipTheme.of(context).labelStyle.color, T.ink);
+    expect(ChipTheme.of(context).labelStyle?.color, T.ink);
     expect(ChipTheme.of(context).backgroundColor, T.surfaceRaised);
     expect(ChipTheme.of(context).selectedColor, T.mintSoft);
   });
