@@ -24,27 +24,27 @@ void main() {
     final router = GoRouter(
       initialLocation: '/profile',
       routes: [
-        GoRoute(
-          path: '/discover',
-          builder: (_, __) => const Scaffold(body: Text('discover')),
-        ),
-        GoRoute(
-          path: '/profile',
-          builder: (_, __) => const Scaffold(body: Text('profile')),
+        ShellRoute(
+          builder: (_, state, child) => AppBackNavigationGuard(
+            currentPath: state.uri.path,
+            child: child,
+          ),
+          routes: [
+            GoRoute(
+              path: '/discover',
+              builder: (_, __) => const Scaffold(body: Text('discover')),
+            ),
+            GoRoute(
+              path: '/profile',
+              builder: (_, __) => const Scaffold(body: Text('profile')),
+            ),
+          ],
         ),
       ],
     );
     addTearDown(router.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp.router(
-        routerConfig: router,
-        builder: (context, child) => AppBackNavigationGuard(
-          router: router,
-          child: child ?? const SizedBox.shrink(),
-        ),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
     expect(find.text('profile'), findsOneWidget);
 
