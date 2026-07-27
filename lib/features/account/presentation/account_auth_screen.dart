@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../config/design_tokens.dart';
 import '../../../config/environment.dart';
 import '../../../core/network/api_client.dart';
-import '../../booking/data/repositories.dart';
 import '../../booking/presentation/booking_screens.dart';
+import '../../parking/data/providers.dart';
 import '../data/social_auth_repository.dart';
 import 'social_auth_buttons.dart';
 
@@ -104,7 +104,9 @@ class _AccountAuthScreenState extends ConsumerState<AccountAuthScreen> {
                         obscureText: true,
                         textInputAction: TextInputAction.done,
                         autofillHints: const [AutofillHints.password],
-                        onSubmitted: (_) => busy ? null : _submit(),
+                        onSubmitted: (_) {
+                          if (!busy) _submit();
+                        },
                         decoration: const InputDecoration(
                           labelText: 'Passwort (mindestens 8 Zeichen)',
                         ),
