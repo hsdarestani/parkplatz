@@ -176,10 +176,15 @@ ThemeData appTheme() {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: T.surfaceRaised,
+      disabledColor: T.surfaceRaised,
       selectedColor: T.mintSoft,
-      side: const BorderSide(color: T.line),
+      checkmarkColor: T.success,
+      side: const BorderSide(color: T.lineStrong),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+      labelStyle: const TextStyle(
+        color: T.ink,
+        fontWeight: FontWeight.w800,
+      ),
     ),
     navigationBarTheme: const NavigationBarThemeData(
       backgroundColor: T.surface,
