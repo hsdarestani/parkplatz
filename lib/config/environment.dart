@@ -14,4 +14,12 @@ class Environment {
     'ALLOW_LOCAL_BOOKING_FALLBACK',
     defaultValue: false,
   );
+
+  // The buttons are rendered now, but the native provider SDKs and backend
+  // exchange remain unavailable until the repository secrets, redirect URIs,
+  // Apple entitlement, and Google platform configuration are complete.
+  static const socialAuthUiEnabled = bool.fromEnvironment(
+    'SOCIAL_AUTH_UI_ENABLED',
+    defaultValue: false,
+  );
 }

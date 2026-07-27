@@ -16,6 +16,11 @@ class Login(BaseModel):
     password: str
 
 
+class SocialAuthToken(BaseModel):
+    id_token: str = Field(min_length=16, max_length=16_384)
+    nonce: str | None = Field(default=None, min_length=8, max_length=512)
+
+
 class Refresh(BaseModel):
     refresh_token: str
 

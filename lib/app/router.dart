@@ -1,12 +1,12 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/account/presentation/account_auth_screen.dart';
 import '../features/account/presentation/account_controls_screen.dart';
 import '../features/account/presentation/login_entry_screen.dart';
 import '../features/account/presentation/password_recovery_screens.dart';
 import '../features/account/presentation/profile_screen.dart';
 import '../features/account/presentation/vehicles_screen.dart';
-import '../features/booking/presentation/booking_screens.dart';
 import '../features/booking/presentation/direct_my_bookings_screen.dart';
 import '../features/booking/presentation/premium_confirmation_pass.dart';
 import '../features/booking/presentation/premium_parking_detail.dart';
@@ -62,7 +62,7 @@ GoRouter createRouter() => GoRouter(
         ),
         GoRoute(
           path: '/register',
-          builder: (context, state) => AuthScreen(
+          builder: (context, state) => AccountAuthScreen(
             register: true,
             returnTo: state.uri.queryParameters['returnTo'],
           ),

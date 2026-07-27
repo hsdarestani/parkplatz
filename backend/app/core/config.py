@@ -40,6 +40,17 @@ class Settings(BaseSettings):
     trust_support_email: str = "app@aplus-solution.de"
     primary_email: str = "app@aplus-solution.de"
 
+    # Social authentication is deliberately disabled until the native provider
+    # configuration, repository secrets, redirect URIs, and token verification
+    # implementation have all been reviewed together.
+    social_auth_exchange_enabled: bool = False
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    apple_oauth_client_id: str = ""
+    apple_oauth_team_id: str = ""
+    apple_oauth_key_id: str = ""
+    apple_oauth_private_key: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
@@ -49,6 +60,27 @@ class Settings(BaseSettings):
     @property
     def openai_enabled(self) -> bool:
         return bool(self.openai_api_key)
+
+    @property
+    def google_auth_configured(self) -> bool:
+        return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
+
+    @property
+    def apple_auth_configured(self) -> bool:
+        return bool(
+            self.apple_oauth_client_id
+            and self.apple_oauth_team_id
+            and self.apple_oauth_key_id
+            and self.apple_oauth_private_key
+        )
+
+    @property
+    def google_auth_enabled(self) -> bool:
+        return self.social_auth_exchange_enabled and self.google_auth_configured
+
+    @property
+    def apple_auth_enabled(self) -> bool:
+        return self.social_auth_exchange_enabled and self.apple_auth_configured
 
     @property
     def admin_email_set(self) -> set[str]:
