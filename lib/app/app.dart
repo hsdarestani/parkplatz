@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../config/brand_config.dart';
 import '../core/theme/app_theme.dart';
-import 'app_back_navigation.dart';
 import 'router.dart';
 
 class FreiraumApp extends StatefulWidget {
@@ -31,10 +30,6 @@ class _FreiraumAppState extends State<FreiraumApp> {
         theme: appTheme(),
         debugShowCheckedModeBanner: false,
         routerConfig: _router,
-        builder: (context, child) => AppBackNavigationGuard(
-          router: _router,
-          child: child ?? const SizedBox.shrink(),
-        ),
       ),
     );
   }
