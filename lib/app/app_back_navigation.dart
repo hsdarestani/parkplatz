@@ -6,38 +6,31 @@ import 'package:go_router/go_router.dart';
 class AppBackNavigationGuard extends StatelessWidget {
   const AppBackNavigationGuard({
     super.key,
-    required this.router,
+    required this.currentPath,
     required this.child,
   });
 
-  final GoRouter router;
+  final String currentPath;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: router.routeInformationProvider,
-        child: child,
-        builder: (context, child) {
-          final path = router.routeInformationProvider.value.uri.path;
-          final fallback = backFallbackForPath(path);
-          final routerCanPop = router.canPop();
+  Widget build(BuildContext context) {
+    final router = GoRouter.of(context);
+    final fallback = backFallbackForPath(currentPath);
+    final routerCanPop = router.canPop();
 
-          return PopScope<Object?>(
-            // At a real in-app root Android may close the app. Everywhere else
-            // we intercept the pop and navigate to the logical parent route.
-            canPop: routerCanPop || fallback == null,
-            onPopInvokedWithResult: (didPop, _) {
-              if (didPop || router.canPop()) return;
-
-              final currentPath =
-                  router.routeInformationProvider.value.uri.path;
-              final target = backFallbackForPath(currentPath);
-              if (target != null && target != currentPath) router.go(target);
-            },
-            child: child ?? const SizedBox.shrink(),
-          );
-        },
-      );
+    return PopScope<Object?>(
+      // At a real in-app root Android may close the app. Everywhere else we
+      // intercept the pop and navigate to the logical parent route.
+      canPop: routerCanPop || fallback == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || router.canPop()) return;
+        final target = backFallbackForPath(currentPath);
+        if (target != null && target != currentPath) router.go(target);
+      },
+      child: child,
+    );
+  }
 }
 
 /// Returns the logical parent for top-level routes that have no Navigator stack.
