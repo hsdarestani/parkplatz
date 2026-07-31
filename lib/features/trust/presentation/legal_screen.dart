@@ -124,11 +124,11 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Fotos und automatische Prüfung',
-              'Anbieter dürfen Fotos ihrer Stellplätze hochladen. Fotos können automatisiert auf Relevanz, Qualität, unzulässige Inhalte und erkennbare personenbezogene Informationen geprüft werden. Nicht freigegebene Fotos werden nicht öffentlich angezeigt.',
+              'Anbieter dürfen ausschließlich eigene oder rechtmäßig nutzbare Fotos von Stellplätzen hochladen. Fotos können automatisiert auf Relevanz, Qualität, unzulässige Inhalte und erkennbare personenbezogene Informationen geprüft werden. Nicht freigegebene Fotos werden nicht öffentlich angezeigt.',
             ),
             (
-              'Bewertungen',
-              'Bewertungen sind nur nach einem bestätigten und zeitlich beendeten Aufenthalt möglich. Nutzer müssen ihre tatsächliche Erfahrung sachlich wiedergeben. Manipulierte oder rechtswidrige Bewertungen können entfernt werden.',
+              'Bewertungen und nutzergenerierte Inhalte',
+              'Bewertungen sind nur nach einem bestätigten und zeitlich beendeten Aufenthalt möglich. Verboten sind insbesondere beleidigende, diskriminierende, bedrohende, sexuelle, gewaltverherrlichende, betrügerische, rechtswidrige, fremde personenbezogene oder sonstige unangemessene Inhalte sowie Spam und Manipulation. Nutzer können problematische Inhalte melden und andere Nutzer blockieren. FREIRAUM kann gemeldete Inhalte prüfen, ausblenden oder entfernen und Konten bei Missbrauch einschränken oder sperren.',
             ),
             (
               'Stornierung und Rückerstattung',
@@ -136,7 +136,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Pflichten der Nutzer',
-              'Nutzer müssen richtige Angaben machen, nur berechtigte Stellplätze anbieten, Zahlungsinformationen sorgfältig prüfen und Stellplätze, Fahrzeuge sowie Zugangsdaten verantwortungsvoll verwenden. Missbrauch, Täuschung und rechtswidrige Inhalte sind untersagt.',
+              'Nutzer müssen richtige Angaben machen, nur berechtigte Stellplätze anbieten, Zahlungsinformationen sorgfältig prüfen und Stellplätze, Fahrzeuge sowie Zugangsdaten verantwortungsvoll verwenden. Missbrauch, Täuschung, Belästigung, Umgehung von Sicherheitsmaßnahmen und rechtswidrige Inhalte sind untersagt.',
             ),
             (
               'Verfügbarkeit und Weiterentwicklung',
@@ -186,19 +186,19 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Verarbeitete Daten',
-              'Verarbeitet werden insbesondere Konto- und Kontaktdaten, Profilbilder, Fahrzeugdaten, Stellplatzinformationen, Standort-Pins, Buchungs- und Zeitdaten, Zahlungsreferenzen, freiwillig hochgeladene Belege und Stellplatzfotos, Bewertungen, Supportangaben sowie technisch notwendige Sicherheitsprotokolle.',
+              'Verarbeitet werden insbesondere Konto- und Kontaktdaten, Profilbilder, Fahrzeugdaten, Stellplatzinformationen, Standort-Pins, Buchungs- und Zeitdaten, Zahlungsreferenzen, freiwillig hochgeladene Belege und Stellplatzfotos, Bewertungen, Support- und Moderationsangaben sowie technisch notwendige Sicherheitsprotokolle.',
             ),
             (
               'Zwecke und Rechtsgrundlagen',
-              'Die Verarbeitung erfolgt zur Registrierung, Vermittlung und Durchführung von Buchungen, zur Zahlungs- und Rückerstattungsdokumentation, zur Kommunikation, Qualitätsprüfung, Missbrauchsprävention und technischen Sicherheit. Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b, c und f DSGVO.',
+              'Die Verarbeitung erfolgt zur Registrierung, Vermittlung und Durchführung von Buchungen, zur Zahlungs- und Rückerstattungsdokumentation, zur Kommunikation, Qualitäts- und Inhaltsmoderation, Missbrauchsprävention und technischen Sicherheit. Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b, c und f DSGVO.',
             ),
             (
               'Standortdaten',
               'Der Gerätestandort wird nur nach Zustimmung verwendet, um Stellplätze in der Nähe anzuzeigen oder eine Route zu berechnen. Nutzer können FREIRAUM auch ohne Standortfreigabe verwenden und Adressen manuell suchen. Genaue Stellplatzadressen, Zugangscodes und Einfahrthinweise werden erst nach einer bestätigten Buchung für den berechtigten Fahrer angezeigt.',
             ),
             (
-              'Bildprüfung',
-              'Hochgeladene Stellplatzfotos können automatisiert analysiert werden, damit ein nutzbarer Stellplatz erkennbar ist und problematische Inhalte oder deutlich erkennbare personenbezogene Daten nicht veröffentlicht werden. Bei nicht eindeutigen Ergebnissen bleibt das Bild in manueller Prüfung.',
+              'Bild- und Inhaltsprüfung',
+              'Hochgeladene Stellplatzfotos können automatisiert analysiert werden, damit ein nutzbarer Stellplatz erkennbar ist und problematische Inhalte oder deutlich erkennbare personenbezogene Daten nicht veröffentlicht werden. Meldungen zu Bewertungen oder anderen nutzergenerierten Inhalten werden zur Moderation gespeichert und bearbeitet. Nutzerblockierungen werden dem jeweiligen Konto zugeordnet, damit blockierte Inhalte ausgeblendet werden können.',
             ),
             (
               'Direkte Zahlungsanbieter',
@@ -210,7 +210,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Speicherdauer und Löschung',
-              'Daten werden nur so lange gespeichert, wie sie für Betrieb, Buchungsabwicklung, Sicherheits- und Nachweiszwecke oder gesetzliche Aufbewahrungspflichten erforderlich sind. Das Konto kann in der App unter Sicherheit & Datenschutz gelöscht werden. Zusätzlich kann eine Löschung ohne App-Zugriff über https://parkplatz.smarbiz.sbs/delete-account angefordert werden. Gesetzlich erforderliche Nachweisdaten werden nur im notwendigen Umfang und ohne aktive Profildaten aufbewahrt.',
+              'Daten werden nur so lange gespeichert, wie sie für Betrieb, Buchungsabwicklung, Moderation, Sicherheits- und Nachweiszwecke oder gesetzliche Aufbewahrungspflichten erforderlich sind. Das Konto kann in der App unter Sicherheit & Datenschutz gelöscht werden. Zusätzlich kann eine Löschung ohne App-Zugriff über https://parkplatz.smarbiz.sbs/delete-account angefordert werden. Gesetzlich erforderliche Nachweisdaten werden nur im notwendigen Umfang und ohne aktive Profildaten aufbewahrt.',
             ),
             (
               'Rechte',
@@ -218,7 +218,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Kontakt',
-              'Datenschutz- und Löschanfragen können an app@aplus-solution.de gesendet werden.',
+              'Datenschutz-, Moderations- und Löschanfragen können an app@aplus-solution.de gesendet werden.',
             ),
           ],
         ),
