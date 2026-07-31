@@ -186,6 +186,10 @@ GoRouter createRouter() => GoRouter(
                   _protected('/trust/verification', const VerificationScreen()),
             ),
             GoRoute(
+              path: '/support',
+              redirect: (context, state) => '/trust/support',
+            ),
+            GoRoute(
               path: '/trust/support',
               builder: (context, state) =>
                   _protected('/trust/support', const SupportRequestScreen()),

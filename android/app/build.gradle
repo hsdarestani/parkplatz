@@ -77,6 +77,27 @@ android {
     }
 }
 
+def freiraumIconSource = rootProject.file("../tool/app_icon_source.webp.b64")
+def freiraumIconOutput = file("src/main/res/drawable/app_icon_source.webp")
+
+tasks.register("prepareFreiraumAppIcon") {
+    inputs.file(freiraumIconSource)
+    outputs.file(freiraumIconOutput)
+    doLast {
+        if (!freiraumIconSource.exists()) {
+            throw new GradleException("FREIRAUM app icon source is missing: ${freiraumIconSource}")
+        }
+        freiraumIconOutput.parentFile.mkdirs()
+        freiraumIconOutput.bytes = java.util.Base64.getDecoder().decode(
+            freiraumIconSource.getText("UTF-8").trim()
+        )
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("prepareFreiraumAppIcon")
+}
+
 flutter {
     source '../..'
 }
