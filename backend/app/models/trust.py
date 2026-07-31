@@ -70,6 +70,31 @@ class SafetyReport(Timestamp, Base):
     )
 
 
+class UserBlock(Base):
+    __tablename__ = "user_blocks"
+    __table_args__ = (
+        UniqueConstraint(
+            "blocker_user_id",
+            "blocked_user_id",
+            name="uq_user_blocks_pair",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    blocker_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    blocked_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default="now()",
+    )
+
+
 class NotificationOutbox(Timestamp, Base):
     __tablename__ = "notification_outbox"
     __table_args__ = (
