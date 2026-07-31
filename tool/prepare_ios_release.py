@@ -3,18 +3,21 @@
 
 from __future__ import annotations
 
+import base64
+import io
 import json
 import plistlib
 import re
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 IOS = ROOT / "ios"
 BUNDLE_ID = "de.freiraum.parking"
 DISPLAY_NAME = "FREIRAUM"
 DEPLOYMENT_TARGET = "15.0"
+ICON_SOURCE = ROOT / "tool" / "app_icon_source.webp.b64"
 
 
 def patch_project() -> None:
@@ -59,10 +62,6 @@ def patch_info_plist() -> None:
         "FREIRAUM verwendet deinen Standort nur nach deiner Zustimmung, "
         "um Stellplätze in deiner Nähe anzuzeigen und auf Wunsch eine Route zu berechnen."
     )
-    # Some location SDK code paths reference the 'always' API even though FREIRAUM
-    # requests location only while the app is in use. Keeping the matching purpose
-    # string prevents App Store binary validation warnings without requesting the
-    # permission proactively.
     data["NSLocationAlwaysAndWhenInUseUsageDescription"] = (
         "FREIRAUM verwendet Standortdaten nur für die Parkplatzsuche und Routenanzeige. "
         "Eine Standortfreigabe im Hintergrund ist für die Nutzung nicht erforderlich."
@@ -75,53 +74,24 @@ def patch_info_plist() -> None:
         "FREIRAUM verwendet die Kamera nur, wenn du ein Foto für einen "
         "Stellplatz oder einen erforderlichen Nachweis aufnehmen möchtest."
     )
-    # The app only uses exempt encryption supplied by the OS/HTTPS stack.
     data["ITSAppUsesNonExemptEncryption"] = False
 
     with info.open("wb") as stream:
         plistlib.dump(data, stream, sort_keys=False)
 
 
-def draw_icon(size: int, target: Path) -> None:
-    image = Image.new("RGB", (size, size), "#0B1726")
-    draw = ImageDraw.Draw(image)
-    margin = int(size * 0.20)
-    draw.ellipse(
-        (margin, margin, size - margin, size - margin),
-        fill="#35D7AC",
+def load_icon_source() -> Image.Image:
+    if not ICON_SOURCE.is_file():
+        raise SystemExit(f"FREIRAUM icon source is missing: {ICON_SOURCE}")
+    raw = base64.b64decode(
+        ICON_SOURCE.read_text(encoding="ascii").strip(),
+        validate=True,
     )
-
-    stroke = max(4, int(size * 0.075))
-    left = int(size * 0.38)
-    top = int(size * 0.29)
-    bottom = int(size * 0.72)
-    bowl_right = int(size * 0.66)
-    bowl_bottom = int(size * 0.52)
-    ink = "#0B1726"
-    draw.rounded_rectangle(
-        (left, top, left + stroke, bottom),
-        radius=max(2, stroke // 3),
-        fill=ink,
-    )
-    draw.arc(
-        (left - stroke // 2, top, bowl_right, bowl_bottom),
-        start=-90,
-        end=90,
-        fill=ink,
-        width=stroke,
-    )
-    draw.line(
-        (left, top, int(size * 0.53), top),
-        fill=ink,
-        width=stroke,
-    )
-    draw.line(
-        (left, bowl_bottom, int(size * 0.53), bowl_bottom),
-        fill=ink,
-        width=stroke,
-    )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    image.save(target, format="PNG", optimize=True)
+    with Image.open(io.BytesIO(raw)) as image:
+        source = image.convert("RGB")
+    if source.size[0] != source.size[1]:
+        raise SystemExit("FREIRAUM icon source must be square")
+    return source
 
 
 def generate_icons() -> None:
@@ -130,6 +100,7 @@ def generate_icons() -> None:
     if not manifest.is_file():
         raise SystemExit("Generated AppIcon Contents.json is missing")
     payload = json.loads(manifest.read_text(encoding="utf-8"))
+    source = load_icon_source()
     generated: set[tuple[str, int]] = set()
     for entry in payload.get("images", []):
         filename = entry.get("filename")
@@ -143,7 +114,13 @@ def generate_icons() -> None:
         key = (filename, pixels)
         if key in generated:
             continue
-        draw_icon(pixels, app_icon / filename)
+        target = app_icon / filename
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.resize((pixels, pixels), Image.Resampling.LANCZOS).save(
+            target,
+            format="PNG",
+            optimize=True,
+        )
         generated.add(key)
     if not generated:
         raise SystemExit("No iOS app icons were generated")
@@ -170,7 +147,13 @@ def verify() -> None:
         if required_key not in data:
             raise SystemExit(f"Missing required App Store plist key: {required_key}")
 
-    icon_1024 = IOS / "Runner" / "Assets.xcassets" / "AppIcon.appiconset" / "Icon-App-1024x1024@1x.png"
+    icon_1024 = (
+        IOS
+        / "Runner"
+        / "Assets.xcassets"
+        / "AppIcon.appiconset"
+        / "Icon-App-1024x1024@1x.png"
+    )
     if icon_1024.is_file():
         with Image.open(icon_1024) as image:
             if image.mode != "RGB" or image.size != (1024, 1024):
