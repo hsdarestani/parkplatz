@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 
 from .base import Base, Timestamp
 
@@ -91,7 +92,7 @@ class UserBlock(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default="now()",
+        server_default=func.now(),
     )
 
 
