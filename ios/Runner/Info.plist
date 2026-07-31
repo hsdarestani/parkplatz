@@ -1,1 +1,20 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleDisplayName</key><string>FREIRAUM</string><key>CFBundleIdentifier</key><string>de.freiraum.parking</string><key>NSLocationWhenInUseUsageDescription</key><string>FREIRAUM nutzt deinen Standort nur auf Wunsch, um Stellplätze in deiner Nähe vorzuschlagen.</string></dict></plist>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>FREIRAUM</string>
+	<key>CFBundleIdentifier</key>
+	<string>de.freiraum.parking</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FREIRAUM verwendet deinen Standort nur nach deiner Zustimmung, um Stellplätze in deiner Nähe anzuzeigen und auf Wunsch eine Route zu berechnen.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>FREIRAUM verwendet Standortdaten nur für die Parkplatzsuche und Routenanzeige. Eine Standortfreigabe im Hintergrund ist für die Nutzung nicht erforderlich.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FREIRAUM benötigt Zugriff auf von dir ausgewählte Fotos, damit du Stellplatzbilder oder erforderliche Nachweise hochladen kannst.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>FREIRAUM verwendet die Kamera nur, wenn du ein Foto für einen Stellplatz oder einen erforderlichen Nachweis aufnehmen möchtest.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>
