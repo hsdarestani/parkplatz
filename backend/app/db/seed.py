@@ -3,6 +3,7 @@ from datetime import time
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.db.session import Session
 from app.models import AvailabilityRule, ParkingSpace
 
@@ -118,7 +119,16 @@ SPACES = [
 ]
 
 
+def demo_seed_allowed() -> bool:
+    """Demo inventory is strictly for development, CI, and test environments."""
+    return settings.environment.strip().lower() != "production"
+
+
 async def seed() -> None:
+    if not demo_seed_allowed():
+        print("Skipping fictional demo parking seed in production.")
+        return
+
     async with Session() as db:
         for slug, title, district, landmark, lat, lng, price in SPACES:
             existing = await db.scalar(
