@@ -64,8 +64,12 @@ jobs:
             --org de.freiraum \
             --project-name freiraum_parking \
             .
-          python3 -m pip install --disable-pip-version-check pillow
-          python3 tool/prepare_ios_release.py
+
+          TOOLS_VENV="$RUNNER_TEMP/freiraum-ios-tools"
+          python3 -m venv "$TOOLS_VENV"
+          "$TOOLS_VENV/bin/python" -m pip install --disable-pip-version-check pillow
+          "$TOOLS_VENV/bin/python" tool/prepare_ios_release.py
+
           cd ios
           pod install --repo-update
 
