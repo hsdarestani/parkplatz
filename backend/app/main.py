@@ -16,6 +16,7 @@ from app.api.routes import router
 from app.api.routing_routes import router as routing_router
 from app.api.social_auth_routes import router as social_auth_router
 from app.api.trust_routes import router as trust_router
+from app.api.ugc_routes import router as ugc_router
 from app.core.config import settings
 from app.core.security import decode
 from app.db.session import Session
@@ -30,6 +31,7 @@ app.include_router(host_schedule_router)
 app.include_router(payment_router)
 app.include_router(launch_router)
 app.include_router(trust_router)
+app.include_router(ugc_router)
 app.include_router(account_router)
 app.include_router(marketplace_router)
 app.include_router(profile_router)
