@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class T {
   static const porcelain = Color(0xFFF4F3EE);
+  static const canvas = porcelain;
   static const porcelainDeep = Color(0xFFEAE7DF);
   static const ink = Color(0xFF0B1726);
   static const inkSoft = Color(0xFF172A3F);
