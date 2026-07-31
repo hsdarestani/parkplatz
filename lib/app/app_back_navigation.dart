@@ -36,7 +36,7 @@ class AppBackNavigationGuard extends StatelessWidget {
 /// Returns the logical parent for top-level routes that have no Navigator stack.
 /// A `null` result marks a real app root where Android may exit normally.
 String? backFallbackForPath(String path) {
-  if (path == '/' || path == '/discover') return null;
+  if (path == '/' || path == '/discover' || path == '/age-check') return null;
 
   final segments = Uri(path: path).pathSegments;
 
