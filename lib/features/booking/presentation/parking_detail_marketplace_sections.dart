@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../config/design_tokens.dart';
 import '../../../shared/models/models.dart';
@@ -116,6 +117,15 @@ class ParkingReviewsSection extends ConsumerWidget {
                         )
                         .toList(),
                   ),
+          ),
+          const Divider(height: 30),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => context.go('/trust/support'),
+              icon: const Icon(Icons.flag_outlined),
+              label: const Text('Problematischen Inhalt melden'),
+            ),
           ),
         ],
       ),

@@ -95,7 +95,11 @@ chmod 600 .env.production
 docker compose -f "$COMPOSE_FILE" up -d db
 docker compose -f "$COMPOSE_FILE" build api notifications
 docker compose -f "$COMPOSE_FILE" run --rm api alembic upgrade heads
-docker compose -f "$COMPOSE_FILE" run --rm api python -m app.db.seed
+
+# Production must never contain the fictional CI/development inventory. Archive
+# unmistakable legacy seed rows left by older deployments instead of reseeding.
+docker compose -f "$COMPOSE_FILE" run --rm api python -m app.db.archive_demo_seed
+
 docker compose -f "$COMPOSE_FILE" up -d
 
 api_container_id="$(docker compose -f "$COMPOSE_FILE" ps -q api)"

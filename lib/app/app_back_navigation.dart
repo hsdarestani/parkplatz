@@ -72,7 +72,8 @@ String? backFallbackForPath(String path) {
       path == '/register' ||
       path == '/forgot-password' ||
       path == '/reset-password' ||
-      path == '/onboarding') {
+      path == '/onboarding' ||
+      path == '/delete-account') {
     return '/discover';
   }
 

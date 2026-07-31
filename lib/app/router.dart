@@ -20,6 +20,7 @@ import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/payment/presentation/direct_payment_checkout_screen.dart';
 import '../features/payment/presentation/host_finance_screen.dart';
 import '../features/payment/presentation/payment_return_screen.dart';
+import '../features/trust/presentation/account_deletion_public_screen.dart';
 import '../features/trust/presentation/admin_trust_screen.dart';
 import '../features/trust/presentation/legal_screen.dart';
 import '../features/trust/presentation/support_request_screen.dart';
@@ -194,6 +195,11 @@ GoRouter createRouter() => GoRouter(
               builder: (context, state) => LegalScreen(
                 section: state.pathParameters['section'] ?? 'privacy',
               ),
+            ),
+            GoRoute(
+              path: '/delete-account',
+              builder: (context, state) =>
+                  const AccountDeletionPublicScreen(),
             ),
           ],
         ),

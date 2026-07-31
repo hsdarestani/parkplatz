@@ -117,7 +117,9 @@ class _AccountAuthScreenState extends ConsumerState<AccountAuthScreen> {
                           value: accepted,
                           onChanged: (value) =>
                               setState(() => accepted = value ?? false),
-                          title: const Text('Ich akzeptiere die Beta-Bedingungen.'),
+                          title: const Text(
+                            'Ich akzeptiere die Nutzungsbedingungen.',
+                          ),
                           controlAffinity: ListTileControlAffinity.trailing,
                         ),
                       if (error != null) ...[
@@ -143,24 +145,27 @@ class _AccountAuthScreenState extends ConsumerState<AccountAuthScreen> {
                           ),
                         ),
                       ),
-                      FutureBuilder<SocialAuthAvailability>(
-                        future: socialAvailability,
-                        initialData: const SocialAuthAvailability.disabled(),
-                        builder: (context, snapshot) {
-                          final availability = snapshot.data ??
-                              const SocialAuthAvailability.disabled();
-                          return SocialAuthButtons(
-                            googleEnabled: Environment.socialAuthUiEnabled &&
-                                availability.googleEnabled,
-                            appleEnabled: Environment.socialAuthUiEnabled &&
-                                availability.appleEnabled,
-                            onGooglePressed: () =>
-                                _socialNotReady(SocialAuthProvider.google),
-                            onApplePressed: () =>
-                                _socialNotReady(SocialAuthProvider.apple),
-                          );
-                        },
-                      ),
+                      // Store builds do not expose unfinished authentication
+                      // providers. When both native/provider setups are complete,
+                      // SOCIAL_AUTH_UI_ENABLED can make this section visible.
+                      if (Environment.socialAuthUiEnabled)
+                        FutureBuilder<SocialAuthAvailability>(
+                          future: socialAvailability,
+                          initialData:
+                              const SocialAuthAvailability.disabled(),
+                          builder: (context, snapshot) {
+                            final availability = snapshot.data ??
+                                const SocialAuthAvailability.disabled();
+                            return SocialAuthButtons(
+                              googleEnabled: availability.googleEnabled,
+                              appleEnabled: availability.appleEnabled,
+                              onGooglePressed: () =>
+                                  _socialNotReady(SocialAuthProvider.google),
+                              onApplePressed: () =>
+                                  _socialNotReady(SocialAuthProvider.apple),
+                            );
+                          },
+                        ),
                       const SizedBox(height: 8),
                       TextButton(
                         onPressed: _switchMode,
@@ -199,7 +204,7 @@ class _AccountAuthScreenState extends ConsumerState<AccountAuthScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Anmeldung mit $label wird nach der sicheren Provider-Einrichtung aktiviert.',
+          'Anmeldung mit $label ist derzeit nicht verfügbar.',
         ),
       ),
     );
@@ -207,7 +212,7 @@ class _AccountAuthScreenState extends ConsumerState<AccountAuthScreen> {
 
   Future<void> _submit() async {
     if (widget.register && !accepted) {
-      setState(() => error = 'Bitte akzeptiere die Beta-Bedingungen.');
+      setState(() => error = 'Bitte akzeptiere die Nutzungsbedingungen.');
       return;
     }
 
