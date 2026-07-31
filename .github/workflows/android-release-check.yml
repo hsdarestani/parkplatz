@@ -57,10 +57,11 @@ jobs:
         run: |
           set -o pipefail
           flutter build appbundle --release \
-            --build-name 0.9.2 \
-            --build-number 3 \
+            --build-name 1.0.0 \
+            --build-number 6 \
             --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
             --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false \
+            --dart-define=SOCIAL_AUTH_UI_ENABLED=false \
             2>&1 | tee /tmp/android-build.log
 
       - name: Upload test AAB
