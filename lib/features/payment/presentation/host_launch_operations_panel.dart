@@ -15,7 +15,6 @@ class HostLaunchOperationsPanel extends ConsumerStatefulWidget {
 class _HostLaunchOperationsPanelState
     extends ConsumerState<HostLaunchOperationsPanel> {
   late Future<_LaunchData> future = _load();
-  bool requesting = false;
   final Set<String> refunding = {};
 
   Future<_LaunchData> _load() async {
@@ -74,7 +73,7 @@ class _HostLaunchOperationsPanelState
         decoration: BoxDecoration(
           color: T.surface,
           borderRadius: BorderRadius.circular(T.radius),
-          border: Border.all(color: subscription.pro ? T.mint : T.line),
+          border: Border.all(color: T.line),
           boxShadow: T.shadowSmall,
         ),
         child: Column(
@@ -86,14 +85,12 @@ class _HostLaunchOperationsPanelState
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: subscription.pro ? T.mintSoft : T.porcelainDeep,
+                    color: T.mintSoft,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    subscription.pro
-                        ? Icons.workspace_premium_outlined
-                        : Icons.rocket_launch_outlined,
-                    color: subscription.pro ? T.success : T.ink,
+                  child: const Icon(
+                    Icons.local_parking_rounded,
+                    color: T.success,
                   ),
                 ),
                 const SizedBox(width: 13),
@@ -101,9 +98,9 @@ class _HostLaunchOperationsPanelState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        subscription.pro ? 'FREIRAUM Pro' : 'FREIRAUM Free',
-                        style: const TextStyle(
+                      const Text(
+                        'FREIRAUM Anbieter',
+                        style: TextStyle(
                           fontSize: 21,
                           fontWeight: FontWeight.w900,
                         ),
@@ -115,7 +112,17 @@ class _HostLaunchOperationsPanelState
                     ],
                   ),
                 ),
-                _PlanBadge(subscription),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: T.mintSoft,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'AKTIV',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 18),
@@ -131,47 +138,11 @@ class _HostLaunchOperationsPanelState
                   )
                   .toList(),
             ),
-            if (!subscription.pro) ...[
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: T.ink,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Wrap(
-                  spacing: 14,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    const SizedBox(
-                      width: 560,
-                      child: Text(
-                        'Pro ist für Anbieter mit mehreren Stellplätzen: bis zu 10 Angebote und kürzere Zahlungsprüfung.',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: subscription.pending || requesting
-                          ? null
-                          : _requestPro,
-                      icon: requesting
-                          ? const SizedBox(
-                              width: 17,
-                              height: 17,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.workspace_premium_outlined),
-                      label: Text(
-                        subscription.pending
-                            ? 'Pro angefragt'
-                            : 'Pro unverbindlich anfragen',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            const SizedBox(height: 12),
+            const Text(
+              'In Version 1.0 werden keine kostenpflichtigen digitalen Upgrades oder Abonnements in der App angeboten.',
+              style: TextStyle(color: T.muted),
+            ),
           ],
         ),
       );
@@ -274,26 +245,6 @@ class _HostLaunchOperationsPanelState
     );
   }
 
-  Future<void> _requestPro() async {
-    setState(() => requesting = true);
-    try {
-      await ref.read(launchOperationsRepositoryProvider).requestPro();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pro-Anfrage wurde gesendet.')),
-      );
-      _reload();
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => requesting = false);
-    }
-  }
-
   Future<void> _completeRefund(ManualRefund item) async {
     final reference = TextEditingController();
     final note = TextEditingController();
@@ -369,29 +320,6 @@ class _HostLaunchOperationsPanelState
       if (mounted) setState(() => refunding.remove(item.paymentId));
     }
   }
-}
-
-class _PlanBadge extends StatelessWidget {
-  const _PlanBadge(this.subscription);
-
-  final HostSubscription subscription;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-        decoration: BoxDecoration(
-          color: subscription.pro ? T.mintSoft : T.porcelainDeep,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          subscription.pending
-              ? 'Anfrage offen'
-              : subscription.pro
-                  ? 'PRO'
-                  : 'FREE',
-          style: const TextStyle(fontWeight: FontWeight.w900),
-        ),
-      );
 }
 
 class _LaunchData {

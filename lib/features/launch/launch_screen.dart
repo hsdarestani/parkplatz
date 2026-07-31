@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/brand_config.dart';
 import '../../config/design_tokens.dart';
+import '../onboarding/presentation/age_gate_screen.dart';
 import '../onboarding/presentation/onboarding_screen.dart';
 
 class LaunchScreen extends StatefulWidget {
@@ -31,8 +32,14 @@ class _LaunchScreenState extends State<LaunchScreen>
       await Future<void>.delayed(const Duration(milliseconds: 850));
     }
     final preferences = await SharedPreferences.getInstance();
+    final ageConfirmed = preferences.getBool(ageConfirmedKey) == true;
+    if (!mounted) return;
+    if (!ageConfirmed) {
+      context.go('/age-check');
+      return;
+    }
     final completed = preferences.getBool(onboardingCompletedKey) == true;
-    if (mounted) context.go(completed ? '/discover' : '/onboarding');
+    context.go(completed ? '/discover' : '/onboarding');
   }
 
   @override

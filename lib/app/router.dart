@@ -16,6 +16,7 @@ import '../features/host/presentation/host_listing_wizard_v2.dart';
 import '../features/host/presentation/host_manage_screen.dart';
 import '../features/host/presentation/host_operations_dashboard.dart';
 import '../features/launch/launch_screen.dart';
+import '../features/onboarding/presentation/age_gate_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/payment/presentation/direct_payment_checkout_screen.dart';
 import '../features/payment/presentation/host_finance_screen.dart';
@@ -41,6 +42,10 @@ GoRouter createRouter() => GoRouter(
           ),
           routes: [
             GoRoute(path: '/', builder: (context, state) => const LaunchScreen()),
+            GoRoute(
+              path: '/age-check',
+              builder: (context, state) => const AgeGateScreen(),
+            ),
             GoRoute(
               path: '/onboarding',
               builder: (context, state) => const OnboardingScreen(),
