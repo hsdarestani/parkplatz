@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     )
     jwt_secret: str = "development-only-change-me"
     environment: str = "development"
-    version: str = "0.9.2"
+    version: str = "1.0.0"
 
     payment_mode: str = "direct"
     public_app_url: str = "http://localhost:8080"
