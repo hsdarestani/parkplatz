@@ -21,7 +21,7 @@ from .base import (
 )
 from .direct_payment import HostDirectPaymentSettings
 from .payment import HostPaymentAccount, Payment, PaymentWebhookEvent
-from .trust import NotificationOutbox, SafetyReport, VerificationRequest
+from .trust import NotificationOutbox, SafetyReport, UserBlock, VerificationRequest
 
 __all__ = [
     "AdminAuditLog",
@@ -45,6 +45,7 @@ __all__ = [
     "Review",
     "SafetyReport",
     "User",
+    "UserBlock",
     "Vehicle",
     "VerificationRequest",
     "audit_events",

@@ -80,55 +80,209 @@ class ParkingReviewsSection extends ConsumerWidget {
                 : Column(
                     children: reviews
                         .map(
-                          (review) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              backgroundImage: review.authorImageUrl == null
-                                  ? null
-                                  : NetworkImage(review.authorImageUrl!),
-                              child: review.authorImageUrl == null
-                                  ? const Icon(Icons.person_outline)
-                                  : null,
-                            ),
-                            title: Row(
+                          (review) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    review.authorName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                    ),
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: CircleAvatar(
+                                    backgroundImage: review.authorImageUrl == null
+                                        ? null
+                                        : NetworkImage(review.authorImageUrl!),
+                                    child: review.authorImageUrl == null
+                                        ? const Icon(Icons.person_outline)
+                                        : null,
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          review.authorName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                      ...List.generate(
+                                        5,
+                                        (index) => Icon(
+                                          index < review.rating
+                                              ? Icons.star_rounded
+                                              : Icons.star_outline_rounded,
+                                          color: T.amber,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(review.comment),
                                   ),
                                 ),
-                                ...List.generate(
-                                  5,
-                                  (index) => Icon(
-                                    index < review.rating
-                                        ? Icons.star_rounded
-                                        : Icons.star_outline_rounded,
-                                    color: T.amber,
-                                    size: 18,
+                                if (review.authorId != null)
+                                  Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: () => _reportReview(
+                                          context,
+                                          ref,
+                                          review,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.flag_outlined,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Melden'),
+                                      ),
+                                      TextButton.icon(
+                                        onPressed: () => _blockAuthor(
+                                          context,
+                                          ref,
+                                          review,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.block_rounded,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Nutzer blockieren'),
+                                      ),
+                                    ],
                                   ),
-                                ),
+                                const Divider(),
                               ],
                             ),
-                            subtitle: Text(review.comment),
                           ),
                         )
                         .toList(),
                   ),
           ),
-          const Divider(height: 30),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => context.go('/trust/support'),
-              icon: const Icon(Icons.flag_outlined),
-              label: const Text('Problematischen Inhalt melden'),
-            ),
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: () => context.go('/trust/support'),
+            icon: const Icon(Icons.support_agent_rounded),
+            label: const Text('Anderes Problem melden'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _reportReview(
+    BuildContext context,
+    WidgetRef ref,
+    ParkingReview review,
+  ) async {
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Bewertung melden',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                leading: const Icon(Icons.warning_amber_rounded),
+                title: const Text('Unangemessener Inhalt'),
+                onTap: () => Navigator.pop(sheetContext, 'inappropriate'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_off_outlined),
+                title: const Text('Belästigung oder Missbrauch'),
+                onTap: () => Navigator.pop(sheetContext, 'harassment'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.report_gmailerrorred_rounded),
+                title: const Text('Spam oder Täuschung'),
+                onTap: () => Navigator.pop(sheetContext, 'spam'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+
+    try {
+      await ref
+          .read(marketplaceRepositoryProvider)
+          .reportReview(review.id, reason: reason);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Danke. Die Meldung wurde an unser Moderationsteam gesendet.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Die Meldung konnte nicht gesendet werden.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _blockAuthor(
+    BuildContext context,
+    WidgetRef ref,
+    ParkingReview review,
+  ) async {
+    final authorId = review.authorId;
+    if (authorId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('${review.authorName} blockieren?'),
+        content: const Text(
+          'Bewertungen dieses Nutzers werden für dich ausgeblendet. Du kannst den Support kontaktieren, wenn du die Blockierung später aufheben möchtest.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Blockieren'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref.read(marketplaceRepositoryProvider).blockUser(authorId);
+      ref.invalidate(parkingReviewsProvider(space.id));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${review.authorName} wurde blockiert.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Der Nutzer konnte nicht blockiert werden.'),
+          ),
+        );
+      }
+    }
   }
 }
