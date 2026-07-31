@@ -11,14 +11,12 @@ if (hasReleaseKeystore) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
-def isCi = System.getenv("CI") == "true"
-def codemagicSigningVariables = [
-    "CM_KEYSTORE_PATH",
-    "CM_KEYSTORE_PASSWORD",
-    "CM_KEY_ALIAS",
-    "CM_KEY_PASSWORD",
-]
-def hasCodemagicSigning = isCi && codemagicSigningVariables.every { System.getenv(it) }
+def isCodemagic = System.getenv("CM_BUILD_ID") != null
+def codemagicKeystorePath = System.getenv("CM_KEYSTORE_PATH")
+def codemagicKeystorePassword = System.getenv("CM_KEYSTORE_PASSWORD")
+def codemagicKeyAlias = System.getenv("CM_KEY_ALIAS")
+def codemagicKeyPassword = System.getenv("CM_KEY_PASSWORD") ?: codemagicKeystorePassword
+def hasCodemagicSigning = isCodemagic && codemagicKeystorePath && codemagicKeystorePassword && codemagicKeyAlias
 
 android {
     namespace "de.freiraum.parking"
@@ -46,15 +44,13 @@ android {
         if (hasCodemagicSigning || hasReleaseKeystore) {
             release {
                 if (hasCodemagicSigning) {
-                    // Codemagic Workflow Editor exposes the configured Android
-                    // signing identity through these environment variables.
-                    storeFile file(System.getenv("CM_KEYSTORE_PATH"))
-                    storePassword System.getenv("CM_KEYSTORE_PASSWORD")
-                    keyAlias System.getenv("CM_KEY_ALIAS")
-                    keyPassword System.getenv("CM_KEY_PASSWORD")
+                    storeFile file(codemagicKeystorePath)
+                    storePassword codemagicKeystorePassword
+                    keyAlias codemagicKeyAlias
+                    keyPassword codemagicKeyPassword
                 } else {
                     keyAlias keystoreProperties["keyAlias"]
-                    keyPassword keystoreProperties["keyPassword"]
+                    keyPassword keystoreProperties["keyPassword"] ?: keystoreProperties["storePassword"]
                     storeFile file(keystoreProperties["storeFile"])
                     storePassword keystoreProperties["storePassword"]
                 }
@@ -64,14 +60,14 @@ android {
 
     buildTypes {
         release {
-            if (isCi && !hasCodemagicSigning) {
+            if (isCodemagic && !(hasCodemagicSigning || hasReleaseKeystore)) {
                 throw new GradleException(
-                    "CI release signing is not configured. Enable Android code signing in Codemagic."
+                    "Codemagic Android signing credentials are unavailable. Re-save Android code signing in the Workflow Editor."
                 )
             }
 
-            // CI must never silently fall back to a debug key. Local release
-            // builds may still use the debug key when no private keystore is present.
+            // Never silently fall back to a debug key on Codemagic Store builds.
+            // Local/GitHub diagnostic release builds may still use debug signing.
             signingConfig (hasCodemagicSigning || hasReleaseKeystore) ? signingConfigs.release : signingConfigs.debug
         }
     }
