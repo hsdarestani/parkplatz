@@ -68,7 +68,11 @@ android {
 
             // Never silently fall back to a debug key on Codemagic Store builds.
             // Local/GitHub diagnostic release builds may still use debug signing.
-            signingConfig (hasCodemagicSigning || hasReleaseKeystore) ? signingConfigs.release : signingConfigs.debug
+            if (hasCodemagicSigning || hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
 }
