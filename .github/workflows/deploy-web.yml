@@ -92,8 +92,12 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build Flutter Web without PWA service-worker cache
-        run: flutter build web --release --base-href / --pwa-strategy=none --dart-define=API_BASE_URL=/api --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
+      - name: Build final Flutter Web release without PWA service-worker cache
+        run: >-
+          flutter build web --release --base-href / --pwa-strategy=none
+          --dart-define=API_BASE_URL=/api
+          --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
+          --dart-define=SOCIAL_AUTH_UI_ENABLED=false
 
       - name: Version production entry assets and direct routes
         run: |
@@ -133,9 +137,8 @@ jobs:
           )
           index.write_text(index_text)
 
-          # Use route directories with index.html so Nginx serves text/html.
-          # Extensionless HTML files are sent as application/octet-stream and
-          # browsers download them instead of rendering the Flutter app.
+          # Route directories guarantee direct Store/privacy links return HTML
+          # instead of 404/download responses when opened outside the app.
           for route in (
               'register',
               'login',
@@ -158,6 +161,7 @@ jobs:
               'legal/privacy',
               'legal/terms',
               'legal/imprint',
+              'delete-account',
           ):
               route_dir = build_dir / route
               route_dir.mkdir(parents=True, exist_ok=True)
@@ -167,8 +171,9 @@ jobs:
               json.dumps(
                   {
                       'commit': sha,
-                      'version': '0.9.0',
-                      'channel': 'public-beta',
+                      'version': '1.0.0',
+                      'build': 6,
+                      'channel': 'production',
                   },
                   separators=(',', ':'),
               ) + '\n'
@@ -273,16 +278,19 @@ jobs:
         if: steps.production_backend_deploy.outcome == 'failure'
         run: exit 1
 
-      - name: Verify deployment, routes, release assets, and production API
+      - name: Verify final deployment, Store routes, release assets, and production API
         if: steps.production_backend_deploy.outcome == 'success'
         run: |
           set -euo pipefail
 
           curl --fail --show-error --silent --retry 10 --retry-delay 3 \
             "https://parkplatz.smarbiz.sbs/build-version.json?deploy=${GITHUB_SHA}" \
-            | grep --fixed-strings "${GITHUB_SHA}"
+            > /tmp/freiraum-build-version.json
+          grep --fixed-strings "${GITHUB_SHA}" /tmp/freiraum-build-version.json
+          grep --fixed-strings '"version":"1.0.0"' /tmp/freiraum-build-version.json
+          grep --fixed-strings '"channel":"production"' /tmp/freiraum-build-version.json
 
-          for route in '' register/ login/ forgot-password/ reset-password/ bookings/ discover/ search/ profile/ account/security/ vehicles/ host/ host/new/ host/finance/ payment-return/ trust/ trust/verification/ trust/support/ admin/trust/ legal/privacy/ legal/terms/ legal/imprint/; do
+          for route in '' register/ login/ forgot-password/ reset-password/ bookings/ discover/ search/ profile/ account/security/ vehicles/ host/ host/new/ host/finance/ payment-return/ trust/ trust/verification/ trust/support/ admin/trust/ legal/privacy/ legal/terms/ legal/imprint/ delete-account/; do
             headers="$(mktemp)"
             body="$(mktemp)"
             curl --fail --location --show-error --silent --retry 10 --retry-delay 3 \
@@ -320,4 +328,4 @@ jobs:
           print(f'Production API ready with {len(spaces)} parking spaces.')
           PY
 
-          echo "Public beta deployment, routes, release assets, production API, and auth lifecycle verified."
+          echo "Production deployment, Store deep links, release assets, API, and auth lifecycle verified."
