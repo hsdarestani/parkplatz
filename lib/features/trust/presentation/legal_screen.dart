@@ -14,7 +14,7 @@ class LegalScreen extends StatelessWidget {
     final content = _content(section);
     return FreiraumScaffold(
       title: content.title,
-      subtitle: 'Rechtliche Informationen für FREIRAUM Public Beta.',
+      subtitle: 'Rechtliche Informationen für FREIRAUM.',
       activePath: '/trust',
       actions: [
         IconButton(
@@ -46,7 +46,7 @@ class LegalScreen extends StatelessWidget {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'FREIRAUM befindet sich in einer öffentlichen Beta. Wesentliche Änderungen werden an dieser Stelle veröffentlicht.',
+                            'Diese Informationen gelten für die aktuelle Version von FREIRAUM. Wesentliche Änderungen werden hier veröffentlicht.',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -139,16 +139,16 @@ _LegalContent _content(String section) => switch (section) {
               'Nutzer müssen richtige Angaben machen, nur berechtigte Stellplätze anbieten, Zahlungsinformationen sorgfältig prüfen und Stellplätze, Fahrzeuge sowie Zugangsdaten verantwortungsvoll verwenden. Missbrauch, Täuschung und rechtswidrige Inhalte sind untersagt.',
             ),
             (
-              'Beta-Betrieb und Verfügbarkeit',
-              'FREIRAUM wird als Public Beta bereitgestellt. Funktionen können erweitert oder angepasst werden. Eine ununterbrochene Verfügbarkeit kann nicht zugesichert werden.',
+              'Verfügbarkeit und Weiterentwicklung',
+              'FREIRAUM wird fortlaufend weiterentwickelt. Funktionen können aus technischen, rechtlichen oder sicherheitsbezogenen Gründen angepasst werden. Eine ununterbrochene Verfügbarkeit kann nicht zugesichert werden.',
             ),
             (
-              'Free und Pro',
-              'Der aktuelle Free-Plan umfasst die grundlegenden Anbieterfunktionen. Pro-Funktionen können während der Beta auf Anfrage freigeschaltet werden. Kostenpflichtige Preise werden vor einer späteren Aktivierung transparent angezeigt und nicht rückwirkend berechnet.',
+              'Free und optionale Zusatzfunktionen',
+              'FREIRAUM Free umfasst die jeweils in der App ausgewiesenen grundlegenden Anbieterfunktionen. Etwaige kostenpflichtige Zusatzfunktionen werden nur nach ausdrücklicher Aktivierung angeboten; Preise und Leistungsumfang werden vor einem Kauf transparent angezeigt.',
             ),
             (
               'Kontakt',
-              'A+ Solution GmbH\nE-Mail: parkplat@aplus-solution.de\nTelefon: +49 69 21000418',
+              'A+ Solution GmbH\nE-Mail: app@aplus-solution.de\nTelefon: +49 69 21000418',
             ),
           ],
         ),
@@ -165,7 +165,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Kontakt',
-              'Telefon: +49 69 21000418\nMobil: +49 172 7779721\nE-Mail: parkplat@aplus-solution.de\nWebsite: www.aplus-solution.de',
+              'Telefon: +49 69 21000418\nMobil: +49 172 7779721\nE-Mail: app@aplus-solution.de\nWebsite: www.aplus-solution.de',
             ),
             (
               'Register und Umsatzsteuer',
@@ -182,7 +182,7 @@ _LegalContent _content(String section) => switch (section) {
           [
             (
               'Verantwortlicher',
-              'A+ Solution GmbH\nCarl-Sonnenschein Straße 57\nD-65936 Frankfurt am Main\nE-Mail: parkplat@aplus-solution.de',
+              'A+ Solution GmbH\nCarl-Sonnenschein Straße 57\nD-65936 Frankfurt am Main\nE-Mail: app@aplus-solution.de',
             ),
             (
               'Verarbeitete Daten',
@@ -193,8 +193,8 @@ _LegalContent _content(String section) => switch (section) {
               'Die Verarbeitung erfolgt zur Registrierung, Vermittlung und Durchführung von Buchungen, zur Zahlungs- und Rückerstattungsdokumentation, zur Kommunikation, Qualitätsprüfung, Missbrauchsprävention und technischen Sicherheit. Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b, c und f DSGVO.',
             ),
             (
-              'Geschützte Standortdaten',
-              'Genaue Stellplatzadressen, Zugangscodes und Einfahrthinweise werden erst nach einer bestätigten Buchung für den berechtigten Fahrer angezeigt.',
+              'Standortdaten',
+              'Der Gerätestandort wird nur nach Zustimmung verwendet, um Stellplätze in der Nähe anzuzeigen oder eine Route zu berechnen. Nutzer können FREIRAUM auch ohne Standortfreigabe verwenden und Adressen manuell suchen. Genaue Stellplatzadressen, Zugangscodes und Einfahrthinweise werden erst nach einer bestätigten Buchung für den berechtigten Fahrer angezeigt.',
             ),
             (
               'Bildprüfung',
@@ -206,11 +206,11 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Empfänger und Hosting',
-              'Daten werden nur an technisch notwendige Dienstleister, Hosting-, E-Mail-, Karten- und Prüfungsanbieter sowie im erforderlichen Umfang an den jeweiligen Buchungspartner übermittelt. Eine Weitergabe an Werbetreibende oder ein Verkauf personenbezogener Daten findet nicht statt.',
+              'Daten werden nur an technisch notwendige Dienstleister, Hosting-, E-Mail-, Karten-, Geocoding-, Routing- und Prüfungsanbieter sowie im erforderlichen Umfang an den jeweiligen Buchungspartner übermittelt. Eine Weitergabe an Werbetreibende oder ein Verkauf personenbezogener Daten findet nicht statt.',
             ),
             (
-              'Speicherdauer',
-              'Daten werden nur so lange gespeichert, wie sie für Betrieb, Buchungsabwicklung, Sicherheits- und Nachweiszwecke oder gesetzliche Aufbewahrungspflichten erforderlich sind. Kontodaten können über die Kontofunktionen zur Löschung angefordert werden, soweit keine gesetzlichen Gründe entgegenstehen.',
+              'Speicherdauer und Löschung',
+              'Daten werden nur so lange gespeichert, wie sie für Betrieb, Buchungsabwicklung, Sicherheits- und Nachweiszwecke oder gesetzliche Aufbewahrungspflichten erforderlich sind. Das Konto kann in der App unter Sicherheit & Datenschutz gelöscht werden. Zusätzlich kann eine Löschung ohne App-Zugriff über https://parkplatz.smarbiz.sbs/delete-account angefordert werden. Gesetzlich erforderliche Nachweisdaten werden nur im notwendigen Umfang und ohne aktive Profildaten aufbewahrt.',
             ),
             (
               'Rechte',
@@ -218,7 +218,7 @@ _LegalContent _content(String section) => switch (section) {
             ),
             (
               'Kontakt',
-              'Datenschutzanfragen können an parkplat@aplus-solution.de gesendet werden.',
+              'Datenschutz- und Löschanfragen können an app@aplus-solution.de gesendet werden.',
             ),
           ],
         ),
