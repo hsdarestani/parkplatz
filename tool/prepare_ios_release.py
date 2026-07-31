@@ -52,13 +52,32 @@ def patch_info_plist() -> None:
         raise SystemExit("Generated Runner Info.plist is missing")
     with info.open("rb") as stream:
         data = plistlib.load(stream)
+
     data["CFBundleDisplayName"] = DISPLAY_NAME
     data["CFBundleName"] = DISPLAY_NAME
     data["NSLocationWhenInUseUsageDescription"] = (
         "FREIRAUM verwendet deinen Standort nur nach deiner Zustimmung, "
-        "um Stellplätze in deiner Nähe anzuzeigen."
+        "um Stellplätze in deiner Nähe anzuzeigen und auf Wunsch eine Route zu berechnen."
     )
+    # Some location SDK code paths reference the 'always' API even though FREIRAUM
+    # requests location only while the app is in use. Keeping the matching purpose
+    # string prevents App Store binary validation warnings without requesting the
+    # permission proactively.
+    data["NSLocationAlwaysAndWhenInUseUsageDescription"] = (
+        "FREIRAUM verwendet Standortdaten nur für die Parkplatzsuche und Routenanzeige. "
+        "Eine Standortfreigabe im Hintergrund ist für die Nutzung nicht erforderlich."
+    )
+    data["NSPhotoLibraryUsageDescription"] = (
+        "FREIRAUM benötigt Zugriff auf von dir ausgewählte Fotos, damit du "
+        "Stellplatzbilder oder erforderliche Nachweise hochladen kannst."
+    )
+    data["NSCameraUsageDescription"] = (
+        "FREIRAUM verwendet die Kamera nur, wenn du ein Foto für einen "
+        "Stellplatz oder einen erforderlichen Nachweis aufnehmen möchtest."
+    )
+    # The app only uses exempt encryption supplied by the OS/HTTPS stack.
     data["ITSAppUsesNonExemptEncryption"] = False
+
     with info.open("wb") as stream:
         plistlib.dump(data, stream, sort_keys=False)
 
@@ -138,6 +157,19 @@ def verify() -> None:
         raise SystemExit("Bundle identifier was not applied")
     if 'TARGETED_DEVICE_FAMILY = "1";' not in project:
         raise SystemExit("The initial release must be iPhone-only")
+
+    info = IOS / "Runner" / "Info.plist"
+    with info.open("rb") as stream:
+        data = plistlib.load(stream)
+    for required_key in (
+        "NSLocationWhenInUseUsageDescription",
+        "NSPhotoLibraryUsageDescription",
+        "NSCameraUsageDescription",
+        "ITSAppUsesNonExemptEncryption",
+    ):
+        if required_key not in data:
+            raise SystemExit(f"Missing required App Store plist key: {required_key}")
+
     icon_1024 = IOS / "Runner" / "Assets.xcassets" / "AppIcon.appiconset" / "Icon-App-1024x1024@1x.png"
     if icon_1024.is_file():
         with Image.open(icon_1024) as image:
