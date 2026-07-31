@@ -6,7 +6,7 @@ on:
       build_number:
         description: 'Unique App Store build number'
         required: true
-        default: '1'
+        default: '6'
 
 permissions:
   contents: read
@@ -24,6 +24,7 @@ jobs:
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      APP_VERSION: '1.0.0'
       BUILD_NUMBER: ${{ inputs.build_number }}
 
     steps:
@@ -83,10 +84,11 @@ jobs:
           flutter build ios \
             --release \
             --no-codesign \
-            --build-name=0.9.0 \
+            --build-name="$APP_VERSION" \
             --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
-            --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
+            --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false \
+            --dart-define=SOCIAL_AUTH_UI_ENABLED=false
 
       - name: Archive signed iPhone app
         run: |
@@ -100,7 +102,7 @@ jobs:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=0.9.0 \
+            MARKETING_VERSION="$APP_VERSION" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
@@ -164,7 +166,7 @@ jobs:
       - name: Upload signed IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: freiraum-ios-0.9.0-${{ inputs.build_number }}
+          name: freiraum-ios-${{ env.APP_VERSION }}-${{ inputs.build_number }}
           path: ${{ env.IPA_PATH }}
           retention-days: 14
           if-no-files-found: error
