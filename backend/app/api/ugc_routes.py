@@ -33,6 +33,40 @@ async def blocked_users(
     return [str(value) for value in values]
 
 
+@router.get("/parking-spaces/{space_id}/reviews")
+async def visible_reviews(
+    space_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[dict[str, object]]:
+    blocked_ids = select(UserBlock.blocked_user_id).where(
+        UserBlock.blocker_user_id == user_id
+    )
+    rows = (
+        await db.execute(
+            select(Review, User)
+            .join(User, User.id == Review.author_id)
+            .where(
+                Review.parking_space_id == space_id,
+                Review.author_id.not_in(blocked_ids),
+            )
+            .order_by(Review.created_at.desc())
+        )
+    ).all()
+    return [
+        {
+            "id": str(review.id),
+            "rating": review.rating,
+            "comment": review.comment,
+            "created_at": review.created_at,
+            "author_id": str(review.author_id),
+            "author_name": user.display_name,
+            "author_image_url": user.profile_image_url,
+        }
+        for review, user in rows
+    ]
+
+
 @router.post("/blocked-users/{blocked_user_id}", status_code=status.HTTP_201_CREATED)
 async def block_user(
     blocked_user_id: uuid.UUID,
