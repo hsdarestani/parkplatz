@@ -62,6 +62,7 @@ class ParkingReview {
     required this.comment,
     required this.createdAt,
     required this.authorName,
+    this.authorId,
     this.authorImageUrl,
   });
 
@@ -70,6 +71,7 @@ class ParkingReview {
   final String comment;
   final DateTime createdAt;
   final String authorName;
+  final String? authorId;
   final String? authorImageUrl;
 
   factory ParkingReview.fromJson(Map<String, dynamic> json) => ParkingReview(
@@ -78,6 +80,7 @@ class ParkingReview {
         comment: json['comment'] as String,
         createdAt: DateTime.parse(json['created_at'].toString()),
         authorName: json['author_name']?.toString() ?? 'FREIRAUM Nutzer',
+        authorId: json['author_id']?.toString(),
         authorImageUrl: json['author_image_url'] == null
             ? null
             : resolveMediaUrl(json['author_image_url'].toString()),
@@ -147,15 +150,41 @@ class MarketplaceRepository {
           )
           .toList();
 
-  Future<List<ParkingReview>> reviews(String spaceId) async =>
-      (await api.get(
+  Future<List<ParkingReview>> reviews(String spaceId) async {
+    List values;
+    try {
+      values = await api.get('/ugc/parking-spaces/$spaceId/reviews') as List;
+    } on ApiUnauthorizedException {
+      values = await api.get(
         '/parking-spaces/$spaceId/reviews',
         authenticated: false,
-      ) as List)
-          .map(
-            (value) => ParkingReview.fromJson(value as Map<String, dynamic>),
-          )
-          .toList();
+      ) as List;
+    }
+    return values
+        .map(
+          (value) => ParkingReview.fromJson(value as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<void> reportReview(
+    String reviewId, {
+    String reason = 'inappropriate',
+    String note = '',
+  }) async {
+    await api.post(
+      '/ugc/reviews/$reviewId/report',
+      body: {'reason': reason, 'note': note.trim()},
+    );
+  }
+
+  Future<void> blockUser(String userId) async {
+    await api.post('/ugc/blocked-users/$userId');
+  }
+
+  Future<void> unblockUser(String userId) async {
+    await api.delete('/ugc/blocked-users/$userId');
+  }
 
   Future<void> createReview(
     String bookingId,
