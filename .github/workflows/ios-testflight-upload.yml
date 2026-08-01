@@ -23,7 +23,7 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      ASC_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
       IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
       IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
       IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
@@ -38,7 +38,7 @@ jobs:
           test -n "$APPLE_TEAM_ID"
           test -n "$ASC_KEY_ID"
           test -n "$ASC_ISSUER_ID"
-          test -n "$ASC_PRIVATE_KEY"
+          test -n "$ASC_PRIVATE_KEY_BASE64"
           test -n "$IOS_DIST_CERT_P12_BASE64"
           test -n "$IOS_DIST_CERT_PASSWORD"
           test -n "$IOS_PROVISIONING_PROFILE_BASE64"
@@ -86,9 +86,15 @@ jobs:
           KEY_DIR="$HOME/.appstoreconnect/private_keys"
           KEY_PATH="$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
           mkdir -p "$KEY_DIR"
-          printf '%s' "$ASC_PRIVATE_KEY" > "$KEY_PATH"
+          printf '%s' "$ASC_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
+
+          grep -q -- '-----BEGIN PRIVATE KEY-----' "$KEY_PATH"
+          grep -q -- '-----END PRIVATE KEY-----' "$KEY_PATH"
+          openssl pkey -in "$KEY_PATH" -noout
+
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          echo "Loaded App Store Connect API key: $ASC_KEY_ID"
 
       - name: Install distribution certificate and provisioning profile
         run: |
