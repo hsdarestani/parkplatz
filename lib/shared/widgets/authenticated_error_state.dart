@@ -21,12 +21,21 @@ class AuthenticatedErrorState extends ConsumerWidget {
 
   bool get _sessionExpired => error is ApiUnauthorizedException;
 
+  String get _message {
+    if (_sessionExpired) {
+      return 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.';
+    }
+
+    if (error is ApiOfflineException || error is StateError) {
+      return 'Die Verbindung konnte gerade nicht hergestellt werden. '
+          'Du kannst es sofort erneut versuchen.';
+    }
+
+    return 'Etwas hat nicht funktioniert. Bitte versuche es erneut.';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final message = _sessionExpired
-        ? 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.'
-        : error.toString();
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -38,7 +47,7 @@ class AuthenticatedErrorState extends ConsumerWidget {
               size: 52,
             ),
             const SizedBox(height: 14),
-            Text(message, textAlign: TextAlign.center),
+            Text(_message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () async {
