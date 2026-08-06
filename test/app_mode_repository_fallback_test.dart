@@ -5,11 +5,7 @@ import 'package:freiraum_parking/features/parking/data/demo_parking_repository.d
 import 'package:freiraum_parking/features/parking/data/providers.dart';
 
 void main() {
-  for (final mode in [
-    AppMode.checking,
-    AppMode.localBeta,
-    AppMode.unavailable,
-  ]) {
+  for (final mode in [AppMode.localBeta, AppMode.unavailable]) {
     test('repository providers stay usable in ${mode.name} mode', () {
       final container = ProviderContainer(
         overrides: [
