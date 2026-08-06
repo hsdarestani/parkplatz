@@ -6,7 +6,7 @@ on:
       build_number:
         description: 'Unique App Store build number'
         required: true
-        default: '7'
+        default: '8'
 
 permissions:
   contents: read
@@ -61,6 +61,12 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Analyze release sources
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run Flutter tests
+        run: flutter test
 
       - name: Generate and prepare iOS project
         run: |
@@ -161,7 +167,7 @@ jobs:
             --build-name="$APP_VERSION" \
             --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
-            --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false \
+            --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=true \
             --dart-define=SOCIAL_AUTH_UI_ENABLED=false
 
       - name: Configure Runner target manual signing

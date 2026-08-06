@@ -10,9 +10,11 @@ import 'demo_parking_repository.dart';
 T _forMode<T>(AppMode mode, T Function() api, T Function() local) {
   return switch (mode) {
     AppMode.checking || AppMode.api => api(),
-    AppMode.localBeta => local(),
-    AppMode.unavailable =>
-      throw StateError('Datenquelle ist noch nicht verfügbar.'),
+    // A temporary health-check failure must not make repository construction
+    // throw during widget build. The unavailable state uses the same safe
+    // local implementation as the explicit beta fallback; Riverpod switches
+    // back to live repositories after a successful retry.
+    AppMode.localBeta || AppMode.unavailable => local(),
   };
 }
 
@@ -128,5 +130,9 @@ final parkingResultsListProvider = Provider<List<ParkingSpace>>((ref) {
 
   final selectedIndex = values.indexWhere((space) => space.id == selected);
   if (selectedIndex <= 0) return values;
-  return [values[selectedIndex], ...values.take(selectedIndex), ...values.skip(selectedIndex + 1)];
+  return [
+    values[selectedIndex],
+    ...values.take(selectedIndex),
+    ...values.skip(selectedIndex + 1),
+  ];
 });

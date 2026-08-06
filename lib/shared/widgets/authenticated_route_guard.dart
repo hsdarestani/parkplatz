@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/parking/data/providers.dart';
+import 'authenticated_error_state.dart';
 
 class AuthenticatedRouteGuard extends ConsumerStatefulWidget {
   const AuthenticatedRouteGuard({
@@ -64,27 +65,11 @@ class _AuthenticatedRouteGuardState
 
           if (snapshot.hasError) {
             return Scaffold(
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.cloud_off_outlined, size: 52),
-                      const SizedBox(height: 14),
-                      Text(
-                        snapshot.error.toString(),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _retry,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Erneut versuchen'),
-                      ),
-                    ],
-                  ),
-                ),
+              body: AuthenticatedErrorState(
+                error: snapshot.error,
+                onRetry: _retry,
+                returnTo: widget.returnTo,
+                onSignIn: _signInAgain,
               ),
             );
           }
