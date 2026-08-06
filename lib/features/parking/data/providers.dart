@@ -9,13 +9,12 @@ import 'demo_parking_repository.dart';
 
 T _forMode<T>(AppMode mode, T Function() api, T Function() local) {
   return switch (mode) {
-    AppMode.api => api(),
-    // Repository providers are watched while the asynchronous health check is
-    // still running. Returning the local implementation for checking and
-    // unavailable states prevents a transient backend/DNS failure from
-    // throwing during widget build. When the API becomes healthy, Riverpod
-    // rebuilds these providers with the live implementation automatically.
-    AppMode.checking || AppMode.localBeta || AppMode.unavailable => local(),
+    AppMode.checking || AppMode.api => api(),
+    // A temporary health-check failure must not make repository construction
+    // throw during widget build. The unavailable state uses the same safe
+    // local implementation as the explicit beta fallback; Riverpod switches
+    // back to live repositories after a successful retry.
+    AppMode.localBeta || AppMode.unavailable => local(),
   };
 }
 
