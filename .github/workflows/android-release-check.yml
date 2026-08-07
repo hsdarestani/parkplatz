@@ -58,7 +58,7 @@ jobs:
           set -o pipefail
           flutter build appbundle --release \
             --build-name 1.0.0 \
-            --build-number 6 \
+            --build-number 7 \
             --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
             --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false \
             --dart-define=SOCIAL_AUTH_UI_ENABLED=false \
@@ -68,7 +68,7 @@ jobs:
         if: steps.android_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: freiraum-android-aab
+          name: freiraum-android-aab-build7
           path: build/app/outputs/bundle/release/*.aab
           if-no-files-found: error
 
@@ -84,7 +84,7 @@ jobs:
               : 'No Android build log was produced.';
             const tail = raw.split('\n').slice(-120).join('\n').slice(-12000);
             const body = ok
-              ? '✅ Independent Android release check succeeded and produced an AAB.\n\n```text\n' + tail + '\n```'
+              ? '✅ Independent Android release check succeeded and produced build 7 AAB.\n\n```text\n' + tail + '\n```'
               : '❌ Independent Android release check failed.\n\n```text\n' + tail + '\n```';
             await github.rest.issues.update({
               owner: context.repo.owner,
