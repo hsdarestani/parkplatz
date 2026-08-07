@@ -1,12 +1,16 @@
 name: Build and Upload FREIRAUM to Google Play
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-google-play-upload.yml'
   workflow_dispatch:
     inputs:
       build_number:
         description: 'Unique Android versionCode'
         required: true
-        default: '6'
+        default: '9'
       track:
         description: 'Google Play track'
         required: true
@@ -36,7 +40,9 @@ jobs:
     timeout-minutes: 40
     env:
       APP_VERSION: '1.0.0'
-      BUILD_NUMBER: ${{ inputs.build_number }}
+      BUILD_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.build_number || '9' }}
+      PLAY_TRACK: ${{ github.event_name == 'workflow_dispatch' && inputs.track || 'internal' }}
+      SHOULD_UPLOAD: ${{ github.event_name == 'push' || inputs.upload_to_play }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -53,7 +59,7 @@ jobs:
           test -n "$ANDROID_KEY_ALIAS"
           test -n "$ANDROID_KEY_PASSWORD"
 
-          if [ "${{ inputs.upload_to_play }}" = "true" ]; then
+          if [ "$SHOULD_UPLOAD" = "true" ]; then
             test -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
           fi
 
@@ -129,18 +135,18 @@ jobs:
       - name: Upload signed AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: freiraum-android-${{ env.APP_VERSION }}-${{ inputs.build_number }}
+          name: freiraum-android-${{ env.APP_VERSION }}-${{ env.BUILD_NUMBER }}
           path: ${{ env.AAB_PATH }}
           retention-days: 14
           if-no-files-found: error
 
       - name: Upload AAB to Google Play
-        if: ${{ inputs.upload_to_play }}
+        if: ${{ github.event_name == 'push' || inputs.upload_to_play }}
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: de.freiraum.parking
           releaseFiles: ${{ env.AAB_PATH }}
-          tracks: ${{ inputs.track }}
+          tracks: ${{ env.PLAY_TRACK }}
           status: completed
-          releaseName: FREIRAUM ${{ env.APP_VERSION }} (${{ inputs.build_number }})
+          releaseName: FREIRAUM ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
