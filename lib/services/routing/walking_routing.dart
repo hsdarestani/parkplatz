@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -124,6 +126,15 @@ final walkingRouteProvider =
   }
 });
 
+class UserLocationFailure implements Exception {
+  const UserLocationFailure(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class UserLocationController extends StateNotifier<AsyncValue<LatLng?>> {
   UserLocationController() : super(const AsyncData(null));
 
@@ -131,31 +142,72 @@ class UserLocationController extends StateNotifier<AsyncValue<LatLng?>> {
     state = const AsyncLoading();
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        throw StateError('Bitte aktiviere die Standortdienste.');
+        await Geolocator.openLocationSettings();
+        throw const UserLocationFailure(
+          'Standortdienste sind ausgeschaltet. Bitte aktiviere sie und tippe danach erneut auf den Standort-Button.',
+        );
       }
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw StateError('Standortfreigabe wurde nicht erteilt.');
+      if (permission == LocationPermission.deniedForever) {
+        await Geolocator.openAppSettings();
+        throw const UserLocationFailure(
+          'Standortzugriff ist für FREIRAUM deaktiviert. Bitte erlaube ihn in den App-Einstellungen.',
+        );
+      }
+      if (permission == LocationPermission.denied) {
+        throw const UserLocationFailure(
+          'Standortzugriff wurde nicht erlaubt. Du kannst die Standortfreigabe jederzeit erneut versuchen.',
+        );
       }
 
-      final position = await Geolocator.getCurrentPosition(
+      final position = await _currentOrLastKnownPosition();
+      if (position == null) {
+        throw const UserLocationFailure(
+          'Dein Standort konnte gerade nicht ermittelt werden. Bitte prüfe GPS und Verbindung und versuche es erneut.',
+        );
+      }
+      return _setPosition(position);
+    } on UserLocationFailure catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      return null;
+    } on LocationServiceDisabledException catch (_, stackTrace) {
+      const error = UserLocationFailure(
+        'Standortdienste sind ausgeschaltet. Bitte aktiviere sie und versuche es erneut.',
+      );
+      state = AsyncError(error, stackTrace);
+      return null;
+    } catch (error, stackTrace) {
+      final failure = UserLocationFailure(
+        error is TimeoutException
+            ? 'Die Standortbestimmung dauert zu lange. Bitte versuche es erneut.'
+            : 'Dein Standort konnte gerade nicht ermittelt werden. Bitte versuche es erneut.',
+      );
+      state = AsyncError(failure, stackTrace);
+      return null;
+    }
+  }
+
+  Future<Position?> _currentOrLastKnownPosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 12),
         ),
       );
-      final value = LatLng(position.latitude, position.longitude);
-      state = AsyncData(value);
-      return value;
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
-      return null;
+    } on TimeoutException {
+      return Geolocator.getLastKnownPosition();
     }
+  }
+
+  LatLng _setPosition(Position position) {
+    final value = LatLng(position.latitude, position.longitude);
+    state = AsyncData(value);
+    return value;
   }
 
   void clear() => state = const AsyncData(null);
