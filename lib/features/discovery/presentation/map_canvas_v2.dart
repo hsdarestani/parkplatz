@@ -38,7 +38,9 @@ class _FreiraumMapV2State extends ConsumerState<FreiraumMapV2> {
     final query = ref.watch(searchProvider);
     final currentLocation = ref.watch(userLocationProvider).valueOrNull;
     final selected = spaces.where((space) => space.id == selectedId).firstOrNull;
-    final compact = MediaQuery.sizeOf(context).width < 620;
+    final mediaSize = MediaQuery.sizeOf(context);
+    final compact = mediaSize.width < 620;
+    final tablet = mediaSize.shortestSide >= 600;
     final request = _requestFor(selected, query, currentLocation);
     final routeState = request == null
         ? const AsyncValue<WalkingRoute?>.data(null)
@@ -134,17 +136,21 @@ class _FreiraumMapV2State extends ConsumerState<FreiraumMapV2> {
                     ...spaces.asMap().entries.map((entry) {
                       final space = entry.value;
                       final isSelected = space.id == selectedId;
+                      final tabletCompactMarker = tablet && !isSelected;
                       final offset = _collisionOffset(entry.key);
                       return Marker(
                         point: LatLng(
                           space.lat + offset.latitude,
                           space.lng + offset.longitude,
                         ),
-                        width: isSelected ? (compact ? 190 : 230) : 84,
+                        width: isSelected
+                            ? (compact ? 190 : 230)
+                            : (tabletCompactMarker ? 46 : 84),
                         height: isSelected ? 60 : 46,
                         child: _ParkingMarker(
                           space: space,
                           selected: isSelected,
+                          tabletCompact: tabletCompactMarker,
                           route: isSelected ? route : null,
                           onTap: () {
                             ref.read(selectedParkingIdProvider.notifier).state =
@@ -225,12 +231,14 @@ class _ParkingMarker extends StatelessWidget {
   const _ParkingMarker({
     required this.space,
     required this.selected,
+    required this.tabletCompact,
     required this.route,
     required this.onTap,
   });
 
   final ParkingSpace space;
   final bool selected;
+  final bool tabletCompact;
   final WalkingRoute? route;
   final VoidCallback onTap;
 
@@ -240,39 +248,67 @@ class _ParkingMarker extends StatelessWidget {
     final routeLabel = route == null
         ? null
         : '${route!.durationMinutes} Min. · ${route!.distanceLabel}';
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: T.normal,
-        padding: EdgeInsets.symmetric(
-          horizontal: selected ? 12 : 9,
-          vertical: selected ? 9 : 7,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? T.ink : T.surface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: T.mint, width: selected ? 2.5 : 1.5),
-          boxShadow: selected ? T.shadowLarge : T.markerShadow,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.local_parking_rounded, color: T.mint, size: 18),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                selected && routeLabel != null ? '$routeLabel · $price' : price,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? Colors.white : T.ink,
-                  fontWeight: FontWeight.w900,
-                  fontSize: selected ? 13 : 12,
-                ),
-              ),
+    final semanticsLabel = '${space.title}, $price';
+
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      child: Tooltip(
+        message: '$price · ${space.title}',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: T.normal,
+            constraints: tabletCompact
+                ? const BoxConstraints.tightFor(width: 42, height: 42)
+                : null,
+            padding: tabletCompact
+                ? EdgeInsets.zero
+                : EdgeInsets.symmetric(
+                    horizontal: selected ? 12 : 9,
+                    vertical: selected ? 9 : 7,
+                  ),
+            decoration: BoxDecoration(
+              color: selected ? T.ink : T.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: T.mint, width: selected ? 2.5 : 1.5),
+              boxShadow: selected ? T.shadowLarge : T.markerShadow,
             ),
-          ],
+            child: tabletCompact
+                ? const Center(
+                    child: Icon(
+                      Icons.local_parking_rounded,
+                      color: T.mint,
+                      size: 20,
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.local_parking_rounded,
+                        color: T.mint,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          selected && routeLabel != null
+                              ? '$routeLabel · $price'
+                              : price,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: selected ? Colors.white : T.ink,
+                            fontWeight: FontWeight.w900,
+                            fontSize: selected ? 13 : 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
