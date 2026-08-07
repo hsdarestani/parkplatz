@@ -57,8 +57,11 @@ jobs:
       - name: Prepare App Store configuration and icon set
         run: |
           set -euo pipefail
-          python3 -m pip install --disable-pip-version-check pillow
-          python3 tool/prepare_ios_release.py
+          python3 -m venv .venv-ios-tools
+          source .venv-ios-tools/bin/activate
+          python -m pip install --disable-pip-version-check --upgrade pip
+          python -m pip install --disable-pip-version-check pillow
+          python tool/prepare_ios_release.py
 
       - name: Install CocoaPods dependencies
         working-directory: ios
@@ -75,6 +78,8 @@ jobs:
           flutter build ios \
             --release \
             --no-codesign \
+            --build-name=1.0.0 \
+            --build-number=7 \
             --dart-define=API_BASE_URL=https://parkplatz.smarbiz.sbs/api \
             --dart-define=ALLOW_LOCAL_BOOKING_FALLBACK=false
 
@@ -89,25 +94,29 @@ jobs:
           BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
           DISPLAY_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist")"
           ENCRYPTION="$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP/Info.plist")"
+          SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")"
+          BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")"
 
           test "$BUNDLE_ID" = "de.freiraum.parking"
           test "$DISPLAY_NAME" = "FREIRAUM"
           test "$ENCRYPTION" = "false"
-          echo "Validated $DISPLAY_NAME ($BUNDLE_ID) with Xcode $(xcodebuild -version | head -1)."
+          test "$SHORT_VERSION" = "1.0.0"
+          test "$BUILD_NUMBER" = "7"
+          echo "Validated $DISPLAY_NAME $SHORT_VERSION ($BUILD_NUMBER), bundle $BUNDLE_ID, with Xcode $(xcodebuild -version | head -1)."
 
       - name: Package unsigned validation artifact
         run: |
           set -euo pipefail
           ditto -c -k --sequesterRsrc --keepParent \
             build/ios/iphoneos/Runner.app \
-            FREIRAUM-iOS-0.9.0-unsigned.zip
+            FREIRAUM-iOS-1.0.0-build7-unsigned.zip
 
       - name: Upload iOS validation artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: freiraum-ios-0.9.0-${{ github.sha }}
+          name: freiraum-ios-1.0.0-build7-${{ github.sha }}
           path: |
-            FREIRAUM-iOS-0.9.0-unsigned.zip
+            FREIRAUM-iOS-1.0.0-build7-unsigned.zip
             ios/Runner/Info.plist
             ios/Runner/Assets.xcassets/AppIcon.appiconset
           retention-days: 14
