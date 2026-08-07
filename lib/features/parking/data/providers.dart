@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/models/models.dart';
 import '../../booking/data/owner_aware_availability_repository.dart';
 import '../../booking/data/repositories.dart';
 import '../../payment/data/payment_aware_booking_repository.dart';
-import '../../../shared/models/models.dart';
 import '../../search/presentation/search_controller.dart';
 import 'demo_parking_repository.dart';
 
@@ -71,9 +71,30 @@ final bookingRepositoryProvider = Provider<BookingRepository>((ref) {
   );
 });
 
+List<ParkingSpace>? _lastKnownParkingSpaces;
+
 final parkingSpacesProvider = FutureProvider<List<ParkingSpace>>((ref) async {
   final repository = ref.watch(parkingRepositoryProvider);
-  return repository.all();
+  Object? lastError;
+  StackTrace? lastStackTrace;
+
+  for (var attempt = 0; attempt < 2; attempt++) {
+    try {
+      final spaces = await repository.all();
+      _lastKnownParkingSpaces = spaces;
+      return spaces;
+    } catch (error, stackTrace) {
+      lastError = error;
+      lastStackTrace = stackTrace;
+      if (attempt == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 450));
+      }
+    }
+  }
+
+  final cached = _lastKnownParkingSpaces;
+  if (cached != null) return cached;
+  Error.throwWithStackTrace(lastError!, lastStackTrace!);
 });
 
 final selectedParkingIdProvider = StateProvider<String?>((ref) => null);
@@ -94,15 +115,22 @@ final parkingResultsProvider = FutureProvider<List<ParkingSpace>>((ref) async {
   if (query.valid) {
     final availability = ref.watch(availabilityRepositoryProvider);
     final checks = await Future.wait(
-      results.map(
-        (space) async => (
-          space,
-          await availability.check(space.id, query.start, query.end),
-        ),
-      ),
+      results.map((space) async {
+        try {
+          return (
+            space,
+            await availability.check(space.id, query.start, query.end),
+          );
+        } catch (_) {
+          // A single transient availability request must not blank the entire
+          // discovery screen. The booking flow validates availability again
+          // before a reservation can be confirmed.
+          return (space, null);
+        }
+      }),
     );
     results = checks
-        .where((entry) => entry.$2.available)
+        .where((entry) => entry.$2?.available != false)
         .map((entry) => entry.$1)
         .toList();
   }
